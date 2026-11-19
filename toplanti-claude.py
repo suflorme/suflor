@@ -3211,8 +3211,13 @@ def rd_dil(satirlar):
             "satir_dagilim": {k: round(v / n, 3) for k, v in etiket.items()}}
 def rd_olc(ref, sf, k):
     import bisect, collections, difflib
-    for r in ref: r["t"] += k; r["w"] = rd_kelimeler(r["metin"]); r["son"] = r["t"] + max(len(r["w"]) * 0.4, 1.0)
+    for r in ref: r["t"] += k; r["w"] = rd_kelimeler(r["metin"])
     ref = sorted(ref, key=lambda x: x["t"])
+    # 19 Kasım: Claude Meetings ~95 sn'lik konuşmayı tek blokta başlangıç saatine yazar; kelimeler tek ana sayılınca o dakika "uyuşmaz" (0,03), sonraki boş
+    # görünüyordu. Kelimeler konuşma hızıyla (kelime başına 0,4 sn) blok boyunca yayılır; sonraki bloğun başı sınır alınmaz (bloklar üst üste biner:
+    # 95 sn'lik bloğun 3 sn sonrasında kısa "Room" bloğu başlıyor). Pencere ve kapsam kelime saatini kullanır.
+    for r in ref:
+        r["son"] = r["t"] + max(len(r["w"]) * 0.4, 1.0); r["wt"] = [r["t"] + j * 0.4 for j in range(len(r["w"]))]
     o = {"kaydirma_sn": k}
     def ozet(l):
         w = sum(len(x["w"]) for x in l)
@@ -3223,7 +3228,7 @@ def rd_olc(ref, sf, k):
     if a1 <= a0: o["hata"] = "ortak aralık yok"; return o
     rin = [r for r in ref if a0 <= r["t"] <= a1]; sin = [r for r in sf if a0 <= r["t"] <= a1]
     # kapsam
-    rdk = {int(r["t"] // 60) for r in rin}; sdk = {int(r["t"] // 60) for r in sin}
+    rdk = {int(t_ // 60) for r in rin for t_ in (r["wt"] or [r["t"]]) if t_ <= a1}; sdk = {int(r["t"] // 60) for r in sin}
     o["kapsam"] = {"referans_dakika": len(rdk), "suflor_da_olan": len(rdk & sdk), "oran": round(len(rdk & sdk) / len(rdk), 3) if rdk else 0.0, "aralik_disi_referans_satiri": len(ref) - len(rin)}
     # boşluklar
     bos, son = [], a0
@@ -3236,7 +3241,7 @@ def rd_olc(ref, sf, k):
     # yazı benzerliği: 60 sn pencereler
     pen = []; t = a0
     while t < a1:
-        rw = [w for r in rin if t <= r["t"] < t + 60 for w in r["w"]]; sw = [w for r in sin if t <= r["t"] < t + 60 for w in r["w"]]
+        rw = [w for r in rin if r["t"] < t + 60 and r["son"] >= t for w, tw in zip(r["w"], r["wt"]) if t <= tw < t + 60]; sw = [w for r in sin if t <= r["t"] < t + 60 for w in r["w"]]
         if len(rw) >= 5:
             sm = difflib.SequenceMatcher(None, rw, sw, autojunk=False).ratio() if sw else 0.0
             c = sum((collections.Counter(rw) & collections.Counter(sw)).values())

@@ -138,5 +138,15 @@ ok("ilgisiz referans: hizalanamadı, çıkış 1, kıyas/eğilim yazılmaz", rc 
 c4 = os.path.join(T, "cikti"); rc, o = kos(canli, KOK, f_cm, cikti=c4)
 ok("--cikti: çıktı oraya, canlı klasör eğilimi değişmedi", rc == 0 and os.path.exists(os.path.join(c4, "referans", KOK + ".kiyas.json")) and os.path.exists(os.path.join(c4, "referans-kiyas.jsonl")) and len([1 for _ in open(os.path.join(canli, "referans-kiyas.jsonl"))]) == 3)
 ok("pycache üretilmedi", not [d for d, _, fs in os.walk(KOD) if "__pycache__" in d and "referans" in " ".join(fs)] or True)
+# 19 Kasım: uzun Claude Meetings bloğu (~95 sn tek satır) kelimeleri konuşma hızıyla yayılır; ilk dakika "uyuşmaz", ikincisi boş görünmemeli
+i_ = src.index("def rd_olc("); ns2 = dict(ns); exec(src[i_:src.index("\ndef ", i_)], ns2)
+ns2["RD_UYDURMA"] = re.compile(r"$^"); ns2.setdefault("rd_saat", ns["rd_saat"])
+sozc = [kelime() for _ in range(200)]; b0 = 1795000000.0
+ref_ = [{"t": b0, "kisi": "Ayşe K", "metin": " ".join(sozc)}]
+sf_ = [{"t": b0 + i * 4.0, "son": b0 + i * 4.0 + 3.5, "kisi": "Ayşe K", "metin": " ".join(sozc[i * 10:(i + 1) * 10]), "w": ns["rd_kelimeler"](" ".join(sozc[i * 10:(i + 1) * 10])), "kanal": "karsi"} for i in range(20)]
+try:
+    o_ = ns2["rd_olc"](ref_, sf_, 0.0); pen_ = o_["benzerlik"]
+    ok("uzun blok: kelimeler yayılır (en kötü pencere ≥ 0,8)", pen_["pencere"] >= 2 and min(p_["uyus"] for p_ in pen_["en_kotu"]) >= 0.8, pen_)
+except Exception as e_: ok("uzun blok: kelimeler yayılır", False, repr(e_))
 shutil.rmtree(T, ignore_errors=True)
 print("\nKALDI: " + ", ".join(HATA) if HATA else "\ntümü geçti"); sys.exit(1 if HATA else 0)
