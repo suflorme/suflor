@@ -6,6 +6,7 @@
 import datetime, json, os, re, shutil, sys, tempfile, threading, time
 sys.dont_write_bytecode = True
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); sys.path.insert(0, KOD)
+sys.path.append(os.path.dirname(os.path.abspath(__file__))); from pano_kaynak import pano_kaynak  # pano.html + pano/js (adım 4); append: test/zeka.py kökteki zeka.py'yi gölgelemesin
 import zeka, teshis
 HATA = []
 def ok(ad, k, ek=None):
@@ -241,7 +242,7 @@ ns["gizli_acik"] = lambda: True
 ok("dusunme: gizli kipte soru da karne de yok", ns["dus_view"]() is None and ns["dus_zeka_soru"]() == [])
 
 # Kaynak denetimi: kurulum KOPYA, teshis KOD_DOSYALARI, pano/dil
-src = lambda p: open(os.path.join(KOD, p), encoding="utf-8").read()
+src = lambda p: pano_kaynak() if p == "pano/pano.html" else open(os.path.join(KOD, p), encoding="utf-8").read()
 ok("kurulum.py KOPYA ve teshis.py KOD_DOSYALARI zeka.py içerir", '"zeka.py"' in src("kurulum.py").split("KOPYA = [", 1)[1].split("]", 1)[0] and "zeka.py" in teshis.KOD_DOSYALARI)
 ok("beta-veri.py haftalık pakette 'zeka' alanı", '"zeka": _beta_zeka(bas, son)' in src("aktarici/beta-veri.py"))
 ok("pano: zkpuan/zkgec düğmeleri /dusunme'ye gider; metinlerin İngilizcesi dil.js'de", "islem:'zeka_puan'" in src("pano/pano.html") and "{a} bu hafta ne kadar akıllıydı?" in src("pano/dil.js") and '"Şimdi değil"' in src("pano/dil.js"))

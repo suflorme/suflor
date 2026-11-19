@@ -7,6 +7,7 @@
 import getpass, json, os, re, shutil, subprocess, sys, tempfile, threading, time, urllib.request
 sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = bos_port(8784)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from pano_kaynak import pano_kaynak  # pano.html + pano/js (adım 4)
 T = os.path.realpath(tempfile.mkdtemp(prefix="duman-")); EV = os.path.join(T, "ev"); DESTEK = os.path.join(EV, "Library", "Application Support", "Suflor"); ORTAK = os.path.join(T, "ortak")
 APP = os.path.join(T, "uyg"); canli = os.path.join(APP, "canli"); os.makedirs(DESTEK); os.makedirs(ORTAK); os.makedirs(canli); proje = os.path.join(T, "proje"); os.makedirs(proje)
 HATA = []
@@ -121,7 +122,7 @@ try:
     # toplantı biterse kip kapanır
     istek("/duman", {"islem": "baslat"}); NABIZ["a"] = False
     ok("toplantı bitince kip kendiliğinden kapandı", bekle(lambda: (dm() or {}).get("aktif") is False, 20))
-    ok("pano: Deneme toplantısı düğmesi ve penceresi kaynakta", all(w in open(os.path.join(KOD, "pano", "pano.html"), encoding="utf-8").read() for w in ("id=ayd2", "id=dmd", "dumanCiz", "'/duman'")))
+    ok("pano: Deneme toplantısı düğmesi ve penceresi kaynakta", all(w in pano_kaynak() for w in ("id=ayd2", "id=dmd", "dumanCiz", "'/duman'")))
 finally:
     r.terminate(); time.sleep(0.5); shutil.rmtree(T, ignore_errors=True)
 print("\nSONUÇ: " + ("hepsi geçti" if not HATA else f"{len(HATA)} başarısız: {HATA}")); sys.exit(1 if HATA else 0)

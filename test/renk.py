@@ -4,8 +4,9 @@
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/renk.py      — renk değiştirince ya da yeni yüzey eklenince
 import os, re, sys
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); ok = []
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from pano_kaynak import pano_kaynak  # pano.html + pano/js (adım 4)
 def kontrol(ad, k): ok.append(bool(k)); print(("✓ " if k else "✗ ") + ad)
-oku = lambda p: open(os.path.join(KOD, p), encoding="utf-8").read()
+oku = lambda p: pano_kaynak() if p == "pano/pano.html" else open(os.path.join(KOD, p), encoding="utf-8").read()
 R = oku("pano/renk.css")
 def jetonlar(blok): return dict(re.findall(r"--([a-z0-9-]+):([^;}]+)", blok))
 acik = jetonlar(R[R.index(":root{"):R.index("@media")]); koyu = jetonlar(R[R.index(":root:not([data-theme=light])"):R.index(":root[data-theme=dark]")])

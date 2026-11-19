@@ -4,6 +4,7 @@
 # + pano/dil/ayar kaynak denetimi.   PYTHONDONTWRITEBYTECODE=1 python3 test/onay-gorunur.py
 import ast, os, re, sys, threading, time
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); HATA = []
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from pano_kaynak import pano_kaynak  # pano.html + pano/js (adım 4)
 def ok(ad, k):
     print(("✓ " if k else "✗ ") + ad)
     if not k: HATA.append(ad)
@@ -69,7 +70,7 @@ ok("_ot_dongu: onay beklemesi hatırlatmalı", "k = _ot_onay_bekle(iz," in src a
 ok("söz sırası: SIRA_UYARI_SN uyarısı ve fırsat çıkmayınca dikkat", "SIRA_UYARI_SN and not OT.get" in src and "söz fırsatı çıkmadı — panoda" in src)
 ok("onay süresi dolunca da dikkat (Şimdi oku açık)", 'if k == "zaman_asimi": _ot_dikkat("onay süresi doldu' in src)
 ok("fısıltı toplantı kanalına gitmez (toplantiya_soyle çağrılmaz)", "toplantiya_soyle" not in src[src.index("def _ot_fisilti"):src.index("def _ot_dikkat")])
-pano = open(os.path.join(KOD, "pano", "pano.html"), encoding="utf-8").read(); dil = open(os.path.join(KOD, "pano", "dil.js"), encoding="utf-8").read()
+pano = pano_kaynak(); dil = open(os.path.join(KOD, "pano", "dil.js"), encoding="utf-8").read()
 relay = open(os.path.join(KOD, "relay.py"), encoding="utf-8").read()
 ok("pano: soylenmedi'de Şimdi oku düğmesi (data-ot=simdi), mini pano CSS'i dahil", "data-ot=simdi" in pano and pano.count(".oto-soylenmedi[role=alert]") == 2)
 ok("pano: karşı kartında sesle onay ipucu, söz sırası sayacı", "Sesle: «{ad}, oku»" in pano and "söz sırası bekleniyor ({n} sn)" in pano)

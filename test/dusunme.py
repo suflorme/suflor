@@ -7,6 +7,7 @@ from esz_yardim import ESZ  # relay.py dosya_yaz_esz (bölüm ad alanı elle kur
 import datetime, json, os, re, secrets, stat, sys, tempfile, threading, time
 sys.dont_write_bytecode = True; os.environ["SUFLOR_TEST_SOZ_DONGU_YOK"] = "1"
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from pano_kaynak import pano_kaynak  # pano.html + pano/js (adım 4)
 HATA = []
 def ok(ad, k, ek=None):
     print(("✓ " if k else "✗ ") + ad + ("" if k or ek is None else f" → {ek}"))
@@ -343,7 +344,7 @@ KB = kur("okunamaz", cevaplar=[gecerli()]); KB["DURUM"].update(bv_hook=lambda: 1
 ok("kaynaklar okunamazsa (istisna) tur çökmez, plan yazılır, karar/fark bölümü yok", rb.get("ok") and "Senin onayını bekleyen" not in KB["DURUM"]["model_cagri"][0]["istem"] and oku(KB, "gun-plani.json")["damga"] == {}, rb)
 
 # --- 11) bağlantılar ---
-rel = open(os.path.join(KOD, "relay.py"), encoding="utf-8").read(); tsh = open(os.path.join(KOD, "teshis.py"), encoding="utf-8").read(); pano = open(os.path.join(KOD, "pano", "pano.html"), encoding="utf-8").read(); dil = open(os.path.join(KOD, "pano", "dil.js"), encoding="utf-8").read()
+rel = open(os.path.join(KOD, "relay.py"), encoding="utf-8").read(); tsh = open(os.path.join(KOD, "teshis.py"), encoding="utf-8").read(); pano = pano_kaynak(); dil = open(os.path.join(KOD, "pano", "dil.js"), encoding="utf-8").read()
 ok("relay.py: bölüm soz-kapisi'nden sonra, status gun_plani, /dusunme pano-yalnız, gizli kipte reddedilir; teshis KOD_DOSYALARI'nda", rel.index('bolum("soz-kapisi")') < rel.index('bolum("dusunme")') and 's["gun_plani"] = dus_view()' in rel and 'self.path == "/dusunme"' in rel and re.search(r'GIZLI_RED = \{[^}]*"/dusunme"', rel) is not None and '"dusunme.py"' in tsh)
 ok("soz-kapisi: gun_plani başlığı ve yoksay süresi tanımlı", "gun_plani" in open(os.path.join(KOD, "aktarici", "soz-kapisi.py"), encoding="utf-8").read().split("SOZ_YOKSAY_SN = ")[1].split("\n")[0] and N["SOZ_BASLIK"]["gun_plani"][0] == "Günün planı hazır")
 ok("pano: Doğru/Yanlış düğmeleri ve gordu çağrısı var; yeni bölüm başlığı yok (var olan Günün özeti kartında)", "data-bn=gpdogru" in pano and "data-bn=gpyanlis" in pano and "islem:'gordu'" in pano and "class=ozet" in pano and pano.count("<section class=ozet") == 1)

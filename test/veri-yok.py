@@ -5,6 +5,7 @@
 import json, os, shutil, subprocess, sys, tempfile, threading, time, urllib.request
 sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = bos_port(8782)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from pano_kaynak import pano_kaynak  # pano.html + pano/js (adım 4)
 T = os.path.realpath(tempfile.mkdtemp(prefix="veriyok-")); canli = os.path.join(T, "canli"); os.makedirs(canli); proje = os.path.join(T, "proje"); os.makedirs(proje)
 HATA = []
 def ok(ad, k):
@@ -62,7 +63,7 @@ try:
     NABIZ["a"] = False
     ok("toplantı bitince veri_yok kalktı", bekle(lambda: vy() is None, 15))
     # pano: sarı uyarı metni kaynakta
-    pano = open(os.path.join(KOD, "pano", "pano.html"), encoding="utf-8").read(); ok("pano durum() veri_yok uyarısı", "s.veri_yok" in pano and "Toplantı sürüyor ama {n} sn'dir döküm gelmiyor" in pano)
+    pano = pano_kaynak(); ok("pano durum() veri_yok uyarısı", "s.veri_yok" in pano and "Toplantı sürüyor ama {n} sn'dir döküm gelmiyor" in pano)
 finally:
     r.terminate(); time.sleep(0.5); shutil.rmtree(T, ignore_errors=True)
 print("\nSONUÇ: " + ("hepsi geçti" if not HATA else f"{len(HATA)} başarısız: {HATA}")); sys.exit(1 if HATA else 0)

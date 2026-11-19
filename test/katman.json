@@ -1,0 +1,303 @@
+{
+ "test/ad-duzelt.py": {
+  "sure": 0.0,
+  "katman": "A"
+ },
+ "test/akis-onceden.py": {
+  "sure": 1.7,
+  "katman": "A"
+ },
+ "test/asistan-kurulum.py": {
+  "sure": 0.1,
+  "katman": "A"
+ },
+ "test/baglayici.py": {
+  "sure": 0.2,
+  "katman": "A"
+ },
+ "test/basecamp-oku.py": {
+  "sure": 0.1,
+  "katman": "A"
+ },
+ "test/bellek.py": {
+  "sure": 0.3,
+  "katman": "A"
+ },
+ "test/brifing-izin.py": {
+  "sure": 9.1,
+  "katman": "A"
+ },
+ "test/brifing-oku.py": {
+  "sure": 2.7,
+  "katman": "A"
+ },
+ "test/bugun-baglam.py": {
+  "sure": 0.0,
+  "katman": "A"
+ },
+ "test/bugun-veri.py": {
+  "sure": 0.1,
+  "katman": "A"
+ },
+ "test/buyuk-harf.py": {
+  "sure": 0.0,
+  "katman": "A"
+ },
+ "test/calisma.py": {
+  "sure": 1.0,
+  "katman": "A"
+ },
+ "test/defter.py": {
+  "sure": 0.1,
+  "katman": "A"
+ },
+ "test/derin-tur.py": {
+  "sure": 0.1,
+  "katman": "A"
+ },
+ "test/derle.py": {
+  "sure": 3.3,
+  "katman": "A"
+ },
+ "test/dil-kilit.py": {
+  "sure": 0.0,
+  "katman": "A"
+ },
+ "test/dis-defter.py": {
+  "sure": 0.1,
+  "katman": "A"
+ },
+ "test/dizin-erisim.py": {
+  "sure": 0.1,
+  "katman": "A"
+ },
+ "test/donanim.py": {
+  "sure": 0.0,
+  "katman": "A"
+ },
+ "test/eposta-yeterdi.py": {
+  "sure": 0.1,
+  "katman": "A"
+ },
+ "test/gemini-gecis.py": {
+  "sure": 0.0,
+  "katman": "A"
+ },
+ "test/gomme-sikistir.py": {
+  "sure": 0.4,
+  "katman": "A"
+ },
+ "test/guncellik.py": {
+  "sure": 0.1,
+  "katman": "A"
+ },
+ "test/hafiza-canli.py": {
+  "sure": 0.1,
+  "katman": "A"
+ },
+ "test/hazirlik-tara.py": {
+  "sure": 0.1,
+  "katman": "A"
+ },
+ "test/hazirlik.py": {
+  "sure": 1.2,
+  "katman": "A"
+ },
+ "test/hitap-bekleme.py": {
+  "sure": 0.0,
+  "katman": "A"
+ },
+ "test/hitap.py": {
+  "sure": 0.2,
+  "katman": "A"
+ },
+ "test/ikinci-dalga.py": {
+  "sure": 1.8,
+  "katman": "A"
+ },
+ "test/ingilizce-ses.py": {
+  "sure": 0.1,
+  "katman": "A"
+ },
+ "test/istem-sira.py": {
+  "sure": 2.7,
+  "katman": "A"
+ },
+ "test/kapi-olcum.py": {
+  "sure": 0.0,
+  "katman": "A"
+ },
+ "test/karsi-hitap.py": {
+  "sure": 19.1,
+  "katman": "A"
+ },
+ "test/kart-oncelik.py": {
+  "sure": 0.1,
+  "katman": "A"
+ },
+ "test/katilimci-tanima.py": {
+  "sure": 0.0,
+  "katman": "A"
+ },
+ "test/kesisim.py": {
+  "sure": 0.3,
+  "katman": "A"
+ },
+ "test/kisilik-dis.py": {
+  "sure": 0.1,
+  "katman": "A"
+ },
+ "test/komsu-ses.py": {
+  "sure": 0.1,
+  "katman": "A"
+ },
+ "test/konus-anlik.py": {
+  "sure": 2.0,
+  "katman": "A"
+ },
+ "test/konus-baglam.py": {
+  "sure": 0.0,
+  "katman": "A"
+ },
+ "test/konus-ses-yardimci.py": {
+  "sure": 16.2,
+  "katman": "A"
+ },
+ "test/konus-yuva.py": {
+  "sure": 0.1,
+  "katman": "A"
+ },
+ "test/konusma-dili.py": {
+  "sure": 0.0,
+  "katman": "A"
+ },
+ "test/kume-sinir.py": {
+  "sure": 0.1,
+  "katman": "A"
+ },
+ "test/moderator.py": {
+  "sure": 0.0,
+  "katman": "A"
+ },
+ "test/mutabakat.py": {
+  "sure": 0.1,
+  "katman": "A"
+ },
+ "test/okuma-sessizlik.py": {
+  "sure": 0.0,
+  "katman": "A"
+ },
+ "test/olcum-sohbet.py": {
+  "sure": 0.1,
+  "katman": "A"
+ },
+ "test/otonom-yanki.py": {
+  "sure": 0.3,
+  "katman": "A"
+ },
+ "test/pano-sozdizimi.py": {
+  "sure": 4.9,
+  "katman": "A"
+ },
+ "test/posta-dizini.py": {
+  "sure": 0.1,
+  "katman": "A"
+ },
+ "test/profil-notu.py": {
+  "sure": 0.6,
+  "katman": "A"
+ },
+ "test/prova.py": {
+  "sure": 1.5,
+  "katman": "A"
+ },
+ "test/renk.py": {
+  "katman": "A",
+  "elle": true,
+  "sure": 0.1
+ },
+ "test/sahte-tazi.py": {
+  "sure": 0.0,
+  "katman": "A"
+ },
+ "test/ses-arsivi-tam.py": {
+  "sure": 38.8,
+  "katman": "A"
+ },
+ "test/ses-duzen.py": {
+  "sure": 1.3,
+  "katman": "A"
+ },
+ "test/ses-kuyruk.py": {
+  "sure": 6.1,
+  "katman": "A"
+ },
+ "test/sesli-terim.py": {
+  "sure": 0.1,
+  "katman": "A"
+ },
+ "test/so-yaz-esz.py": {
+  "sure": 1.0,
+  "katman": "A"
+ },
+ "test/surec-yenileme.py": {
+  "sure": 0.1,
+  "katman": "A"
+ },
+ "test/takvim-bekle.py": {
+  "sure": 0.0,
+  "katman": "A"
+ },
+ "test/takvim-suzgec.py": {
+  "sure": 18.4,
+  "katman": "A"
+ },
+ "test/tara.py": {
+  "sure": 0.3,
+  "katman": "A"
+ },
+ "test/tek-kart.py": {
+  "sure": 0.2,
+  "katman": "A"
+ },
+ "test/tekrar-dongu.py": {
+  "sure": 0.0,
+  "katman": "A"
+ },
+ "test/temiz-dokum.py": {
+  "sure": 0.3,
+  "katman": "A"
+ },
+ "test/vt-sor.py": {
+  "sure": 1.0,
+  "katman": "A"
+ },
+ "test/yanki-tanima.py": {
+  "sure": 4.5,
+  "katman": "A"
+ },
+ "test/yanki.py": {
+  "sure": 0.1,
+  "katman": "A"
+ },
+ "test/yerel-konus.py": {
+  "sure": 21.5,
+  "katman": "A"
+ },
+ "test/yerel-ses-ayar.py": {
+  "sure": 0.1,
+  "katman": "A"
+ },
+ "test/yetim-surec.py": {
+  "sure": 11.1,
+  "katman": "A"
+ },
+ "test/zeka-altin.py": {
+  "sure": 0.1,
+  "katman": "A"
+ },
+ "test/zeka.py": {
+  "sure": 0.4,
+  "katman": "A"
+ }
+}

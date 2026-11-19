@@ -7,12 +7,13 @@
 import ast, collections, datetime, json, os, re, shutil, subprocess, sys, tempfile, threading, time, urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from pano_kaynak import pano_kaynak  # pano.html + pano/js (adım 4)
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); T = tempfile.mkdtemp(prefix="roxie-"); hata = []
 def ok(ad, k, ek=None):
     print(("✓ " if k else "✗ ") + ad + ("" if k or ek is None else f" → {ek}"))
     if not k: hata.append(ad)
 def yaz(ad, govde): y = os.path.join(T, ad); open(y, "w", encoding="utf-8").write(govde); return y
-def oku(d, f): return open(os.path.join(KOD, d, f) if d else os.path.join(KOD, f), encoding="utf-8").read()
+def oku(d, f): return pano_kaynak() if (d, f) == ("pano", "pano.html") else open(os.path.join(KOD, d, f) if d else os.path.join(KOD, f), encoding="utf-8").read()
 def fonks(src, adlar, atamalar=()):
     agac = ast.parse(src)
     return ast.Module([n for n in agac.body if (isinstance(n, ast.FunctionDef) and n.name in adlar) or (isinstance(n, ast.Assign) and any(getattr(x, "id", None) in atamalar for x in n.targets))], [])

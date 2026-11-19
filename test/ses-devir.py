@@ -8,6 +8,7 @@ import base64, contextlib, http.server, importlib.util as u, io, json, os, shuti
 sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
 PORT, GPORT = bos_port(8776), bos_port(0)
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); T = tempfile.mkdtemp(prefix="suflor-sd-"); hata = []
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from pano_kaynak import pano_kaynak  # pano.html + pano/js (adım 4)
 def bak(ad, kosul): print(("✓ " if kosul else "✗ ") + ad); hata.extend([] if kosul else [ad])
 GELEN = []
 class Sahte(http.server.BaseHTTPRequestHandler):
@@ -42,7 +43,7 @@ def cikti(fn, *a, bekle=0.0, **k):
 bak("ton etiketi ayıklanır", m.ton_ayikla("<ton:sakin> Anladım, bakıyorum.") == ("Anladım, bakıyorum.", "sakin"))
 bak("bilinmeyen ton yok sayılır, etiket yine silinir", m.ton_ayikla("<ton:kizgin> Peki.") == ("Peki.", None))
 bak("Mac sesinde, panoda ve toplantıya söylerken de silinir (etiket_sil)", m.etiket_sil("<ton:yumusak> Tamam <chuckle> olur.") == "Tamam olur.")
-pano = open(os.path.join(KOD, "pano", "pano.html"), encoding="utf-8").read()
+pano = pano_kaynak()
 # v0.118.0'dan beri pano ve mini pano cevabı tek işlevden (konusGorunum) çizer; temizleme kalıbı tek yerde
 bak("pano cevap gösteriminde ton etiketi gizli (konusGorunum, pano + mini pano)", pano.count("hmm|ton:\\s*[a-z_]+)>") == 1 and "function konusGorunum(s,mini_" in pano)
 # 2) durum tonu kuralı

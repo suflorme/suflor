@@ -8,6 +8,7 @@ import contextlib, datetime, importlib.util as u, io, json, os, shutil, sys, tem
 sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
 PORT = bos_port(8771)
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); T = tempfile.mkdtemp(prefix="suflor-gs-"); hata = []
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from pano_kaynak import pano_kaynak  # pano.html + pano/js (adım 4)
 def bak(ad, kosul): print(("✓ " if kosul else "✗ ") + ad); hata.extend([] if kosul else [ad])
 for f in ("relay.py", "manifest.json"): shutil.copy(os.path.join(KOD, f), T)
 for d in ("aktarici", "pano"): shutil.copytree(os.path.join(KOD, d), os.path.join(T, d))
@@ -62,7 +63,7 @@ toplanti(); r = post("/komut", {"tur": "gizli"})
 bak("ikinci basış kapatır, satırlar yeniden yazılır", r.get("ok") and not m.gizli_acik() and m.gemini_izinli(True) and not os.path.exists(m.GIZLI_FP))
 post("/ingest", {"meeting": {"title": "Deneme Toplantı"}, "source": "transcript", "entries": [{"id": "a/3", "speaker": "Veli", "time": "00:03", "text": "gizli sonrası satır"}]})
 bak("kapandıktan sonra satır yazılır, aradaki içerik yok", "gizli sonrası satır" in open(os.path.join(m.BASE, m.STATE["file"]), encoding="utf-8").read())
-pano = open(os.path.join(KOD, "pano", "pano.html"), encoding="utf-8").read()
+pano = pano_kaynak()
 bak("panoda ve mini panoda 🔒 düğmesi ve uyarı şeridi", "id=gz " in pano and "id=mgz " in pano and pano.count("gizliCiz(") == 3 and "tur:\"gizli\"" in pano and "gzb" in pano)
 izle = open(os.path.join(KOD, "toplanti-claude.py"), encoding="utf-8").read()
 bak("izle: gizlide tek GİZLİ TOPLANTI satırı, sonra olay yok", 'emit("GİZLİ TOPLANTI: kullanıcı açtı' in izle and "time.sleep(2); continue" in izle)

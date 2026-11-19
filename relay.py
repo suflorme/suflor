@@ -1082,6 +1082,15 @@ def pano_dosyasi(ad):  # pano/ altındaki sayfa (pano.html, yazi.css); dosya de�
     m = os.path.getmtime(fp)
     if _PANO.get(fp, (None,))[0] != m: _PANO[fp] = (m, open(fp, encoding="utf-8").read())
     return _PANO[fp][1]
+# Pano betiği (mimari denetim 2, adım 4; 19 Kasım): pano.html'in tek satır içi <script>'i pano/js/NN-ad.js dosyalarına bölündü (yalnız üst düzey deyim
+# sınırlarından; her dosya tek başına node --check'ten geçer). Sıra dosya adındaki iki haneli önektir; sayfa yine tek <script>: dosyalar art arda eklenip
+# /*__PANO_JS__*/ yerine konur (kapsam, küresel adlar ve çalışma sırası bölmeden önceki satır içi betikle bayt bayt aynı; son satır sonu atılır).
+PANO_JS_AD = re.compile(r"\d\d-[a-z0-9-]+\.js")
+def pano_js():  # aynı ad kuralı ve sıra: pano-denetim.py (sözdizimi) ve test/pano_kaynak.py (testlerin okuduğu kaynak)
+    d = next((os.path.join(k, "js") for k in PANO_DIZIN if os.path.isdir(os.path.join(k, "js"))), None)
+    if not d: raise FileNotFoundError("pano/js yok — aktarici-kur.command ile yeniden kur")
+    s = "".join(pano_dosyasi("js/" + a) for a in sorted(f for f in os.listdir(d) if PANO_JS_AD.fullmatch(f)))
+    return s[:-1] if s.endswith("\n") else s
 def marka_dosyasi(yol):
     ad = os.path.basename(yol); alt = "yazi" if yol.startswith("/marka/yazi/") else ""
     if not re.fullmatch(r"[a-z0-9-]+\.(woff2|svg)", ad): return None
@@ -2456,7 +2465,9 @@ def sayfa(ad, yol=""):  # yazı tipleri + arayüz dili (ayar "dil": tr|en; denem
     # arayüz metinlerinin İngilizcesi tek kaynakta (pano/dil.js; eklenti de aynı dosyayı yükler) — sayfaya gömülür
     # yerel anahtar (pano/anahtar.js): tek kullanımlık ?t= ile açılan sayfaya anahtar gömülür, yoksa sayfa kendi deposundan alır
     anh = pano_dosyasi("anahtar.js").replace("__SAYFA_ANAHTAR__", CARD_KEY if tek_kullanim_al(yol) else "")
-    return pano_dosyasi(ad).replace("/*__YAZI__*/", pano_dosyasi("yazi.css")).replace("/*__RENK__*/", pano_dosyasi("renk.css")).replace("/*__DIL_SOZLUK__*/", pano_dosyasi("dil.js")).replace("/*__BUGUN__*/", pano_dosyasi("bugun.css")) \
+    h = pano_dosyasi(ad)
+    if "/*__PANO_JS__*/" in h: h = h.replace("/*__PANO_JS__*/", pano_js())  # önce betik: aşağıdaki yer tutucular (__DIL__ dahil) eskisi gibi tüm sayfada değişir
+    return h.replace("/*__YAZI__*/", pano_dosyasi("yazi.css")).replace("/*__RENK__*/", pano_dosyasi("renk.css")).replace("/*__DIL_SOZLUK__*/", pano_dosyasi("dil.js")).replace("/*__BUGUN__*/", pano_dosyasi("bugun.css")) \
         .replace("/*__ANAHTAR__*/", anh).replace("__DIL__", dil).replace("<html lang=tr>", f"<html lang={dil}>")
 
 # --- Rota tablosu (mimari denetim 3, bulgu 3; 19 Kasım) -------------------------------------------------------------------------------------------------------------------

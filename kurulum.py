@@ -1611,6 +1611,7 @@ def kur():
     elif _h is None: print("UYARI: node bulunamadı — pano/eklenti JavaScript sözdizimi denetlenmedi.")
     for f in ("pano.html", "yazi.css", "dil.js", "anahtar.js", "bugun.css"):
         if not os.path.isfile(os.path.join(KOD, "pano", f)): sys.exit(f"HATA: pano/{f} eksik — kurulum yapılmadı, çalışan aktarıcı olduğu gibi bırakıldı.")
+    if not glob_(os.path.join(KOD, "pano", "js", "[0-9][0-9]-*.js")): sys.exit("HATA: pano/js betikleri eksik (pano.html'in betiği) — kurulum yapılmadı, çalışan aktarıcı olduğu gibi bırakıldı.")  # KOPYA'daki pano/ alt klasörüyle kopyalanır
     os.makedirs(app, exist_ok=True)
     ys = []
     def _ys(a): ys.extend(yerel_ses_bul(a, Y["ortak"])); return None if ys else False  # False: değişiklik yok, ayar yeniden yazılmaz

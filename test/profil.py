@@ -3,6 +3,7 @@
 # Bellek miktarı sahte verilir (8 ve 32 GB). Çalıştır: PYTHONDONTWRITEBYTECODE=1 python3 test/profil.py
 import ast, os, sys
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from pano_kaynak import pano_kaynak  # pano.html + pano/js (adım 4)
 src = open(os.path.join(KOD, "kurulum.py"), encoding="utf-8").read(); a = ast.parse(src); ns = {}
 sec = [n for n in a.body if (isinstance(n, ast.FunctionDef) and n.name in {"donanim_durum", "profil_hafif"}) or (isinstance(n, ast.Assign) and any(getattr(x, "id", None) in {"BELLEK_KARARLI_GB", "BELLEK_HAFIF_GB"} for x in n.targets))]
 exec(compile(ast.Module(sec, []), "kurulum.py", "exec"), ns)
@@ -40,7 +41,7 @@ r = oku({"ses_motoru": "pocket"}); kontrol("relay ayar_oku: profilsiz (geliştir
 r = oku({"profil": "tam"}); kontrol("relay ayar_oku: profil tam → türetme yok", "anlam_arama" not in r)
 rl = open(os.path.join(KOD, "relay.py"), encoding="utf-8").read()
 kontrol("relay AYAR_PANO'da profil, ayar_yaz profil_uygula çağırıyor", '"profil": ("sec", "tam", ("tam", "hafif"))' in rl and 'profil_uygula(a, yeni["profil"])' in rl)
-pano = open(os.path.join(KOD, "pano", "pano.html"), encoding="utf-8").read(); dj = open(os.path.join(KOD, "pano", "dil.js"), encoding="utf-8").read()
+pano = pano_kaynak(); dj = open(os.path.join(KOD, "pano", "dil.js"), encoding="utf-8").read()
 kontrol("pano AYG'de Kurulum profili + dil.js İngilizcesi", "['profil','sec','Kurulum profili'" in pano and '"Kurulum profili": "Setup profile"' in dj)
 # kaynak denetimi: indirme ve arayüz kancaları
 for k in ("if profil_hafif(): return pocket_durum()", "not anlam_ok and not hafif", "not hafif and not anlam_dene", '"/api/profil"', 'profil_uygula(a, c["profil"])'):

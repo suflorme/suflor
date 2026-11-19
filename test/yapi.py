@@ -6,6 +6,7 @@
 import json, os, re, shutil, sqlite3, subprocess, sys, tempfile, time, urllib.request
 sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = bos_port(8777)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from pano_kaynak import pano_kaynak  # pano.html + pano/js (adım 4)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from gizlichrome import chrome_yolu, CHROME_EK  # Dock'ta görünmeyen kopya
 CHROME = chrome_yolu()
 hata = []
@@ -184,7 +185,7 @@ try:
     s3 = (st3.get("son_toplantilar") or [{}])[0]; h3 = open(oz3[:-3] + "-zihin-haritasi.html", encoding="utf-8").read()
     bak("bitir 2 karar: aynı adla karar ve iş panosu, aktarıcıda tür karar_is", "karar ve iş panosu" in b3.stdout and "— karar ve iş panosu</title>" in h3
         and s3.get("gorsel") == "karar_is" and os.path.exists(s3.get("harita", "")))
-    pn = open(os.path.join(KOD, "pano", "pano.html"), encoding="utf-8").read()
+    pn = pano_kaynak()
     bak("panoda menü etiketi türe göre", "r.gorsel==='karar_is'?L('Karar ve iş panosu'):L('Zihin haritası')" in pn)
     nb = tc("bitir", os.path.join(T, "yok.md"))
     bak("bitir: özet yoksa açık hata", nb.returncode != 0 and "özet .md bulunamadı" in nb.stderr)

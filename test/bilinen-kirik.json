@@ -1,0 +1,5 @@
+{
+ "test/renk.py": {"neden": "3 eski renk jetonu hatası (WCAG)", "son_tarih": "2026-12-03"},
+ "test/okuma-sessizlik.py": {"neden": "NameError yt_kuyruga (önceden var)", "son_tarih": "2026-12-03"},
+ "test/sahte-tazi.py": {"neden": "HEAD'de kırık", "son_tarih": "2026-12-03"}
+}

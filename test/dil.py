@@ -9,9 +9,10 @@
 import json, os, re, sys
 
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from pano_kaynak import pano_kaynak  # pano.html + pano/js (adım 4)
 KULLANAN = ["popup.js", "background.js", "content.js", "pano/pano.html", "pano/dokum-kontrol.html", "pano/kesisim.html"]
 YASAK = re.compile(r"\b(dashboard|board)\b", re.I)
-oku = lambda y: open(os.path.join(KOD, y), encoding="utf-8").read()
+oku = lambda y: pano_kaynak() if y == "pano/pano.html" else open(os.path.join(KOD, y), encoding="utf-8").read()
 hatalar = []
 
 # 1–2. tek kaynak: her satırda bir "tr": "en" girdisi

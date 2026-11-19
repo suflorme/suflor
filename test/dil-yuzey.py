@@ -12,7 +12,8 @@
 import json, os, re, sys
 
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-oku = lambda y: open(os.path.join(KOD, y), encoding="utf-8").read()
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from pano_kaynak import pano_kaynak  # pano.html + pano/js (adım 4)
+oku = lambda y: pano_kaynak() if y == "pano/pano.html" else open(os.path.join(KOD, y), encoding="utf-8").read()
 hatalar = []
 TRK = re.compile(r"[çğıöşüÇĞİÖŞÜ]")
 STR = r'"(?:[^"\\]|\\.)*"'

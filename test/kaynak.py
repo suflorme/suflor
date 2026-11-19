@@ -5,6 +5,7 @@
 import ast, json, os, shutil, signal, subprocess, sys, tempfile, threading, time, urllib.error, urllib.request
 sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); HATA = []
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from pano_kaynak import pano_kaynak  # pano.html + pano/js (adım 4)
 def ok(ad, k):
     print(("✓ " if k else "✗ ") + ad)
     if not k: HATA.append(ad)
@@ -96,7 +97,7 @@ try:
     bekle("normal"); time.sleep(0.8); k = istek("/status")["kaynak"]; ok(f"alanlar dolu ({k})", k["bos_yuzde"] == 60 and k["takas_gb"] == 0 and k["t"])
     json.dump(olc(8, 7.0, 1.0), open(sahte, "w")); ok("sahte ölçüm kritik → /status kaynak.duzey kritik", bekle("kritik"))
     ok("günlükte geçiş satırı", "KAYNAK: normal → " in open(os.path.join(T, "relay.log"), encoding="utf-8").read())
-    html = open(os.path.join(KOD, "pano", "pano.html"), encoding="utf-8").read(); dil = open(os.path.join(KOD, "pano", "dil.js"), encoding="utf-8").read()
+    html = pano_kaynak(); dil = open(os.path.join(KOD, "pano", "dil.js"), encoding="utf-8").read()
     ok("pano kartı ve İngilizcesi var", 'kaynak.duzey==="kritik"' in html and "Mac is overloaded" in dil)
     json.dump(olc(60), open(sahte, "w")); ok("ölçüm düzelince (6 ardışık) normale döner", bekle("normal", 10))
 finally:

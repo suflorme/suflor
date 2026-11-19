@@ -5,6 +5,7 @@
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/bilgi-kaynagi.py
 import importlib.util, json, os, re, subprocess, sys, time, types
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); sys.dont_write_bytecode = True
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from pano_kaynak import pano_kaynak  # pano.html + pano/js (adım 4)
 def yukle(ad, kaynak):
     m = types.ModuleType(ad); m.__file__ = os.path.join(KOD, "aktarici", "beyin.py"); exec(compile(kaynak, m.__file__, "exec"), m.__dict__); return m
 BY = yukle("beyin_yeni", open(os.path.join(KOD, "aktarici", "beyin.py"), encoding="utf-8").read())
@@ -148,7 +149,7 @@ for dl in ("tr", "en"):
 kontrol("brifing sonucu: veri yalnız kaynak açıkken ve doluysa eklenir", 'if bilgi and temiz(j.get("veri"), 3): sonuc["veri"]' in bf)
 kontrol("brifing kaynağı Konuş'la aynı kuraldan (ayar, gizli kip, yedek)", "bilgi = konus_bilgi_kaynaklari()" in bf and "BEYIN.brifing_args(AYAR, istem, BASE, yalin, bilgi if yalin else None)" in bf)
 kontrol("FIFO kipinde mesaj BRIFING_BILGI_SN sonra yazılır, giriş kapanır", "time.sleep(max(0, BRIFING_BILGI_SN - (time.time() - t0)))" in bf and "os.close(w)" in bf)
-pn = open(os.path.join(KOD, "pano", "pano.html"), encoding="utf-8").read(); df = open(os.path.join(KOD, "aktarici", "defter.py"), encoding="utf-8").read()
+pn = pano_kaynak(); df = open(os.path.join(KOD, "aktarici", "defter.py"), encoding="utf-8").read()
 kontrol("'Güncel veri' panoda dört yerde (hazırlık, brifing, brifing penceresi, Bugün), defterde ve Konuş'un sıradaki toplantı bloğunda", pn.count("'Güncel veri'") == 4 and '("veri", "dikkat", "acik", "gecmis")' in df and '("veri", _t("Güncel veri"' in kod)
 # 7. toplantı oturumu izin kararı (5 Kasım): okuma araçları ve web onaysız; yazma sorulur; aynı araç yeniden/paralel sorulmaz; gizli toplantıda web yok
 import threading
