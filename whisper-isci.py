@@ -22,7 +22,9 @@ if "/" in MODEL and not os.path.isdir(MODEL):  # depo adı: çevrimdışı açı
 UYDURMA = re.compile(r"altyaz[ıi]\s*m\.?\s*k|izlediğiniz için teşekkür|субтитр|yoyo television|优优独播|abone ol(mayı|un)|beğenmeyi unutma|bir sonraki videoda|"
                      r"^\W*(abone ol|[İi]zlediğiniz için)\W*$|"  # 3 Kasım: tek başına duran kalıp (cümle içindeki "abone olmak istiyorum" gerçek söz, kalır)
                      r"thanks? (you )?for watching|subtitles? by|please subscribe|amara\.org|transcribed by|"
-                     r"^\W*(müzik|music|alkış|applause|\[.*\]|\(.*\))\W*$", re.I)
+                     r"^\W*(müzik|music|alkış|applause|\[.*\]|\(.*\))\W*$|"
+                     # 19 Kasım (Claude Meetings kıyası): toplantı öncesi sessizlikte kendi kanala art arda 12 "Obrigada." (-26…-39 dB) — tek başına duran yabancı teşekkür
+                     r"^\W*(obrigad[ao]|gracias|merci( beaucoup)?|danke( schön)?|grazie)\W*$", re.I)
 # 23 Ekim üçlü sohbet denemesi: Fransızca altyazı imzası kullanıcının gerçek sözünün başına yapıştı ("- Sous-titrage: N-S-T-R, O Arkadaşlar sakin olun…");
 # bölümü atmak sözü de atardı — imza ve ardından gelen büyük harf kısaltmaları kırpılır, kalan söz tutulur (kalan yoksa bölüm uydurma sayılır).
 UYDURMA_ON = re.compile(r"^\W*(?i:sous[- ]?titr\w*|untertitel\w*|ondertitel\w*|sottotitol\w*|subt[ií]tul\w*|napisy|legendas?)\b\W*"
@@ -260,8 +262,14 @@ def konusma_var(a, np, sr=16000):
     r = np.sqrt((a[:m * k].reshape(m, k) ** 2).mean(1)) + 1e-6
     p90 = float(np.percentile(r, 90))
     return p90 >= 0.02 and p90 / float(np.percentile(r, 10)) >= 3
+# 19 Kasım (Claude Meetings kıyası): duraksama sesi "ııı" Türkçe çözümde "Ğııı", "ĞI", "Ğ" diye yazılıyor (bir toplantıda 41 satır, 8 toplantıda görüldü). Türkçede
+# sözcük ğ ile başlamaz: ğ/Ğ ile başlayıp yalnız ı/i/ğ süren parça duraksamadır, silinir (sözcük içindeki ğ'ye dokunulmaz).
+TR_DURAKSAMA = re.compile(r"(?<![\w'’])[ĞğĞ][ĞğıIiİ]*(?![\w'’])[,.…]?")
 def tr_harf(x, dil):  # Türkçe çözümde Azerice "ə" (11 Ekim: arka plandaki haber "muhabirənin … adreslər" yazıldı) → "e"
-    return x.replace("ə", "e").replace("Ə", "E") if dil == "tr" else x
+    if dil != "tr": return x
+    x = x.replace("ə", "e").replace("Ə", "E")
+    if "Ğ" in x or "ğ" in x: x = " ".join(TR_DURAKSAMA.sub(" ", x).split())
+    return x
 # Tamamı büyük harfli çıktı (3 Kasım, testler/kisa-soru-cpp-mlx-20261103.md): istem yalnız büyük harfli kısaltmalardan oluşunca (sözlüğü boş yeni kurulum)
 # whisper.cpp kısa Türkçe soruyu "BÜPÇE KAÇ LİRA?" diye büyük harfle yazıyor. Dil tr iken ≥ 3 harf ve ≥ 2 sözcük, harflerin tamamı büyükse Türkçe kuralla küçültülür;
 # istemde geçen ve istekle gelen "kisaltma" (sözlüğün büyük harfli terimleri; istem 215 belirteçle sınırlı) kısaltmalar büyük kalır, cümle başları büyütülür. Tek sözcük ("AWS.") dokunulmaz.

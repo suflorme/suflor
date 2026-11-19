@@ -3,6 +3,7 @@
 #   izle  : transkript/not/soru/kart olaylarını satır satır yazar (Claude Code "Monitor" aracıyla izlenir)
 #   kart  : panoya / mini panoya / Teams şeridine kart gönderir: soyle · dur · cevap · not (kart-anahtari.txt ile)
 #   etiket: duygu etiketi — pano başlığında genel ton ya da --kim ile kişi başına (kart değil)
+#   referans-dokum: dış referans dökümüyle (Claude Meetings, Meet, Teams) Suflor dökümünü aynı ölçütle karşılaştırır (yalnız yerel dosya)
 #   olcum : gecikme raporu — eklenti sabitlemesi, SORU→CEVAP, HAZIR tetik→kart
 #   ara   : proje + geçmiş toplantı araması (v0.5.0, baglam.py) — SORU gelince izle ilk 3 sonucu kendisi ekler
 #   hazir : hazir.json'daki önceden yazılmış kartı gönderir; izle, tetik kelimesi geçince "HAZIR hN" yazar
@@ -163,6 +164,9 @@ dk.add_argument("--goster", action="store_true", help="yazmadan .md'yi yazdır")
 ad = sub.add_parser("ekranlar", aliases=["adimlar"], help="toplantı sonu: sunulan ekranlar (paylaşımda kendiliğinden alınan görüntüler) + kanıtlar döküm satırlarıyla saat sırasıyla; görüntüler özetin yanına kopyalanır → Claude özete 'Sunulan ekranlar' (gerekirse adım belgesi) yazar")
 ad.add_argument("dosya", nargs="?", help="toplantı .md/.jsonl (yoksa en yenisi)"); ad.add_argument("--kim", default=None, help="dosya adındaki konu (yoksa toplantı başlığı)")
 ad.add_argument("--cikti", default=None, help="klasör (yoksa <proje>/gorusmeler, o da yoksa <proje>)")
+rd_p = sub.add_parser("referans-dokum", help="19 Kasım: dış referans dökümüyle (claude-meetings, meet, teams) Suflor dökümünü karşılaştırır: kaydırma, kapsam, boşluk, yazı uyuşması, uydurma adayı, konuşmacı, dil (yalnız yerel dosya)")
+rd_p.add_argument("--dosya", required=True, help="referans döküm dosyası"); rd_p.add_argument("--kaynak", choices=["claude-meetings", "meet", "teams"], default=None, help="yoksa içerikten tahmin edilir")
+rd_p.add_argument("--toplanti", default=None, help="toplantı kökü ya da .md/.jsonl adı (yoksa en yenisi)"); rd_p.add_argument("--json", action="store_true"); rd_p.add_argument("--cikti", default=None, help="çıktı klasörü (yoksa canlı klasör)")
 sub.add_parser("durum", help="v0.14.0: aktarıcının /status yanıtı (JSON; yerel anahtarla — anahtarsız curl 401 alır)")
 sg = sub.add_parser("saglik", help="v0.8.5: toplantı öncesi sağlık kontrolü (aktarıcı, eklenti sürümü, Whisper, ses modeli, bellek, disk)")
 tk = sub.add_parser("takvim", help="v0.9.3: Mac Takvim'den sıradaki toplantılar (davet notu, katılımcılar); --id ile tek toplantı")
@@ -2387,8 +2391,29 @@ def toplanti_basligi(md):  # .md'nin başlığı; yoksa (v0.12.5 öncesi başlı
         if m: return m.group(1)
     except OSError: pass
     return re.sub(r"^\d{4}-\d\d-\d\d-\d{4}-", "", md[:-3]).replace("-", " ")
+# 19 Kasım (Claude Meetings kıyası): canlıda sözlük bağlamı göremediği satırı "? Cloud=Claude" diye işaretleyip düzeltmiyor; aynı toplantıda aynı düzeltme
+# başka satırda kesinleşmişse ("✎ Cloud=Claude") temiz dökümde işaretli satır da düzeltilir. İşaretsiz satıra dokunulmaz (gerçek "cloud" kalır).
+SOZ_IS_RX = re.compile(r"([✎?]) ([^\s=|]+)=([^\s|]+)")
+def soz_suphe_cozum(md):  # → {(saat, metnin ilk 40 harfi): [(yanlış, doğru), …]} yalnız kesinleşmiş çiftler
+    try: satir = open(os.path.join(A.dir, md), encoding="utf-8").read().splitlines()
+    except OSError: return {}
+    kesin, suphe = set(), []
+    for l in satir:
+        h = [x.strip() for x in l.split("|")]
+        if len(h) < 6 or not re.match(r"\d\d:\d\d:\d\d$", h[1]): continue
+        for tur, y, d in SOZ_IS_RX.findall(h[4]):
+            if tur == "✎": kesin.add((y, d))
+            else: suphe.append(((h[1], h[3][:40]), (y, d)))
+    out = {}
+    for k, c in suphe:
+        if c in kesin: out.setdefault(k, []).append(c)
+    return out
+def soz_suphe_uygula(metin, ciftler):
+    for y, d in ciftler: metin = re.sub(r"(?<!\w)" + re.escape(y) + r"(?!\w)", d, metin)
+    return metin
 def dokum_satirlari(md):
     son, sira, ek = {}, [], []
+    suphe = soz_suphe_cozum(md)
     for r in kayitlar(md):
         if "text" in r:
             if r.get("id") not in son: sira.append(r.get("id"))
@@ -2401,6 +2426,7 @@ def dokum_satirlari(md):
     for i in sira:
         r = son[i]; t = (r.get("text") or "").strip(); b = an(r)
         if not t or b is None: continue
+        if suphe and (c := suphe.get((r.get("time") or "", t[:40]))): t = soz_suphe_uygula(t, c)
         bt = float(r["t1"]) if r.get("t1") else None
         kim = (r.get("speaker") or "").strip()
         if r.get("_bol") and r.get("t0"):  # iki kişili satır (konuşmacı yeniden etiketleme): bölümlerine
@@ -3045,9 +3071,277 @@ def geri_bildirim_cmd():
           "düzeltmeyi kullanıcı onaylayınca yap, sonra `toplanti-claude.py geri-bildirim --okundu`")
     for f in ls: print(("• " if f in yeni else "  ") + os.path.join(d, f))
 
+# --- 19 Kasım: referans-dokum — dış referans dökümüyle (Claude Meetings, Google Meet, Teams) Suflor dökümünü aynı ölçütle karşılaştırır ---------------
+# Yalnız yerel dosya okur/yazar (ağ yok). Çıktılar <canli>/referans/ altında (kişi adı içerir: iç belge, 0600/0700). "uyuşma" der, hata oranı (WER) iddiası yok:
+# referans da hatalı olabilir. Kaydırma: referans saatini Suflor'a oturtan sn (aligned_t = ref_t + kaydirma).
+RD_YOK = {"room", "unknown", "bilinmeyen", "speaker", "konuşmacı", "konusmaci", "karşı taraf"}
+RD_UYDURMA = re.compile(r"altyaz[ıi]\s*m\.?\s*k|izlediğiniz için teşekkür|obrigad[oa]|субтитр|abone ol(mayı|un)\W*$|thanks? (you )?for watching|subtitles? by|please subscribe|amara\.org|^\W*(thank you|thanks|bye|teşekkürler|teşekkür ederim)\W*$|^\W*(müzik|music|alkış|applause)\W*$", re.I)  # whisper-isci.py UYDURMA'nın kısaltılmışı (o dosya model yükler, içe aktarılmaz)
+RD_EN = set("the and is are was were to of in that it for on with this have not you but they we be at as from by or an will would can could there what about which when your all if do so just".split())
+RD_TR = set("bir ve bu da de için ile ama çok gibi var yok ne ben sen biz daha değil evet hayır şey ki mi mı mu mü o şu en ya yani tamam sonra şimdi olarak olan kadar bunu bunun".split())
+def rd_kelimeler(m): return re.findall(r"\w+", kucuk(str(m or "")))
+def rd_epoch(s):
+    try: return datetime.datetime.fromisoformat(str(s).replace("Z", "+00:00")).timestamp()
+    except ValueError: return None
+def rd_saat(t): return datetime.datetime.fromtimestamp(t).strftime("%H:%M:%S")
+def rd_suflor(md):
+    # son hâli geçerli (aynı id'nin revised satırı); t = ses başı (t0), yoksa at − (t0 olanlarda ortanca at−t0)
+    son, sira = {}, []
+    for r in kayitlar(md):
+        if not isinstance(r, dict) or not str(r.get("text") or "").strip(): continue
+        k = r.get("id") or f"_{len(sira)}"
+        if k not in son: sira.append(k)
+        son[k] = r
+    fark = sorted(rd_epoch(r.get("at")) - r["t0"] for r in son.values() if r.get("t0") and rd_epoch(r.get("at")))
+    med = fark[len(fark) // 2] if fark else 0.0
+    out = []
+    for k in sira:
+        r = son[k]; at = rd_epoch(r.get("at"))
+        t = float(r["t0"]) if r.get("t0") else (at - med if at else None)
+        if t is None: continue
+        sn = max(float(r["t1"]) - t, 0.0) if r.get("t1") else 0.0
+        w = rd_kelimeler(r["text"])
+        out.append({"t": t, "son": t + (sn or max(len(w) * 0.4, 1.0)), "kisi": str(r.get("speaker") or ""), "metin": str(r["text"]).strip(), "kanal": r.get("kanal") or "", "w": w})
+    out.sort(key=lambda x: x["t"])
+    return out
+def rd_tahmin(icerik):
+    if icerik.lstrip("\ufeff").lstrip().startswith("WEBVTT"): return "teams"
+    if re.search(r"^\d{1,2}:\d\d:\d\d\s*(AM|PM)\s*\[", icerik, re.M): return "claude-meetings"
+    return "meet"
+def rd_ayristir(icerik, kaynak, s0):
+    # → (satırlar [{t, kisi, metin}], atlanan satır sayısı, mutlak mı). Göreli kaynakta t = göreli sn + s0 (kaydırma taraması düzeltir).
+    sat, atla = [], 0
+    if kaynak == "claude-meetings":
+        rx = re.compile(r"^\s*(\d{1,2}):(\d\d):(\d\d)\s*(AM|PM)\s*\[(.+?)\]\s*\((speech|chat)\)\s*(.*)$")
+        gun = int(s0 // 86400) * 86400; onceki = None; ilk = True
+        for l in icerik.splitlines():
+            if not l.strip(): continue
+            m = rx.match(l)
+            if not m: atla += 1; continue
+            h, mi, sn, ap, ad, tur, metin = m.groups(); h = int(h) % 12 + (12 if ap == "PM" else 0)
+            if tur != "speech" or ad.strip().lower() == "claude" or not metin.strip(): continue
+            t = gun + h * 3600 + int(mi) * 60 + int(sn)
+            if ilk:  # tarih yok: Suflor başına en yakın gün
+                if t - s0 > 43200: gun -= 86400; t -= 86400
+                elif s0 - t > 43200: gun += 86400; t += 86400
+                ilk = False
+            elif onceki is not None and t < onceki - 3600: gun += 86400; t += 86400  # gece yarısı geçti (küçük sıra bozukluğu 1 saate kadar tolerans)
+            onceki = max(onceki or t, t)
+            sat.append({"t": float(t), "kisi": ad.strip(), "metin": metin.strip()})
+        return sat, atla, True
+    if kaynak == "teams":
+        rx = re.compile(r"^(\d+:)?(\d\d):(\d\d)[.,](\d{1,3})\s*-->")
+        bl = icerik.replace("\r", "").split("\n\n")
+        for b in bl:
+            ls = [x for x in b.split("\n") if x.strip()]
+            i = next((i for i, x in enumerate(ls) if "-->" in x), None)
+            if i is None:
+                if ls and not ls[0].startswith(("WEBVTT", "NOTE", "STYLE")): atla += len(ls)
+                continue
+            m = rx.match(ls[i])
+            if not m: atla += 1; continue
+            t = int((m.group(1) or "0:")[:-1]) * 3600 + int(m.group(2)) * 60 + int(m.group(3)) + int(m.group(4).ljust(3, "0")) / 1000
+            metin = " ".join(ls[i + 1:]); mv = re.match(r"^\s*<v(?:\.[\w.]+)?\s+([^>]+)>(.*?)(</v>)?\s*$", metin)
+            if mv: ad, metin = mv.group(1).strip(), mv.group(2)
+            else:
+                ma = re.match(r"^([^:<]{1,60}):\s+(.*)$", metin); ad, metin = (ma.group(1).strip(), ma.group(2)) if ma else ("", metin)
+            metin = " ".join(re.sub(r"<[^>]+>", "", metin).split())
+            if metin: sat.append({"t": t + s0, "kisi": ad, "metin": metin})
+        return sat, atla, False
+    # meet: zaman damgası satırı + "Ad Soyad: metin"
+    rz = re.compile(r"^\s*(\d{1,2}):(\d\d):(\d\d)\s*$"); rk = re.compile(r"^\s*([^:\d][^:]{0,60}?):\s+(\S.*)$")
+    ATLA_B = ("attendees", "transcript", "invited", "meeting ended", "notes by", "date", "summary", "details", "next steps", "decisions")
+    blok = []  # (başlangıç sn, [(ad, metin)])
+    for l in icerik.splitlines():
+        if not l.strip(): continue
+        m = rz.match(l)
+        if m: blok.append([int(m.group(1)) * 3600 + int(m.group(2)) * 60 + int(m.group(3)), []]); continue
+        mk = rk.match(l)
+        if not mk or mk.group(1).strip().lower().startswith(ATLA_B): atla += 1; continue
+        if not blok: blok.append([0, []])
+        blok[-1][1].append((mk.group(1).strip(), mk.group(2).strip()))
+    for i, (b0, ls) in enumerate(blok):
+        if not ls: continue
+        b1 = blok[i + 1][0] if i + 1 < len(blok) else b0 + 30
+        d = max(b1 - b0, 1) / len(ls)
+        for k, (ad, mt) in enumerate(ls): sat.append({"t": b0 + k * d + s0, "kisi": ad, "metin": mt})
+    return sat, atla, False
+def rd_hizala(ref, sf, mutlak):
+    # referans kelimelerinin (≥4 harf) ±pencere sn içinde Suflor'da da geçtiği sayı; kaydırma taranır (mutlak ±120 sn, 5 sn adım; göreli −15…+45 dk, 30 sn adım; sonra ince)
+    import bisect
+    zs = {}
+    for r in sf:
+        for w in r["w"]:
+            if len(w) >= 4: zs.setdefault(w, []).append(r["t"])
+    for v in zs.values(): v.sort()
+    kel = [(r["t"], w) for r in ref for w in rd_kelimeler(r["metin"]) if len(w) >= 4]
+    if not kel or not zs: return None
+    def puan(k, pen):
+        n = 0
+        for t, w in kel:
+            v = zs.get(w)
+            if not v: continue
+            i = bisect.bisect_left(v, t + k - pen)
+            if i < len(v) and v[i] <= t + k + pen: n += 1
+        return n
+    adim, aralik = (5, range(-120, 121, 5)) if mutlak else (30, range(-900, 2701, 30))
+    tum = {k: puan(k, max(10, adim)) for k in aralik}
+    en = max(tum, key=tum.get)
+    asama = [(5, range(en - adim, en + adim + 1, 5))] if not mutlak else []
+    for ad_, ar in asama:
+        for k in ar: tum[k] = puan(k, 10)
+        en = max((k for k in ar), key=lambda k: tum[k])
+    ince = {}
+    for _ in range(2):  # ince tarama: ±5 sn pencere; eşit en iyiler arasında ortadaki (düzlüğün merkezi); ikinci tur merkezi yeniden ortalar
+        for k in range(en - 12, en + 13):
+            if k not in ince: ince[k] = puan(k, 5)
+        enp = max(v for k, v in ince.items() if abs(k - en) <= 12); ek = sorted(k for k, v in ince.items() if v == enp and abs(k - en) <= 12); en = ek[len(ek) // 2]
+    tum.update(ince)
+    medy = sorted(v for v in tum.values())[len(tum) // 2]
+    return {"kaydirma": float(en), "puan": ince[en], "kelime": len(kel), "oran": round(ince[en] / len(kel), 3), "ortanca_puan": medy, "tarama": len(tum)}
+def rd_dil(satirlar):
+    harf = tr = en_s = tr_s = top = 0; etiket = {"tr": 0, "en": 0, "belirsiz": 0}
+    for m in satirlar:
+        w = rd_kelimeler(m); top += len(w)
+        h = sum(c.isalpha() for c in m); t = sum(c in "çğıöşüÇĞİÖŞÜ" for c in m); harf += h; tr += t
+        e, s = sum(x in RD_EN for x in w), sum(x in RD_TR for x in w); en_s += e; tr_s += s
+        sk_tr, sk_en = s + (2 if t else 0), e
+        etiket["tr" if sk_tr > sk_en else "en" if sk_en > sk_tr else "belirsiz"] += 1
+    n = max(len(satirlar), 1)
+    return {"tr_karakter_oran": round(tr / harf, 3) if harf else 0.0, "en_stopword_oran": round(en_s / top, 3) if top else 0.0, "tr_stopword_oran": round(tr_s / top, 3) if top else 0.0,
+            "satir_dagilim": {k: round(v / n, 3) for k, v in etiket.items()}}
+def rd_olc(ref, sf, k):
+    import bisect, collections, difflib
+    for r in ref: r["t"] += k; r["w"] = rd_kelimeler(r["metin"]); r["son"] = r["t"] + max(len(r["w"]) * 0.4, 1.0)
+    ref = sorted(ref, key=lambda x: x["t"])
+    o = {"kaydirma_sn": k}
+    def ozet(l):
+        w = sum(len(x["w"]) for x in l)
+        return {"ilk": rd_saat(min(x["t"] for x in l)), "son": rd_saat(max(x["son"] for x in l)), "sure_sn": round(max(x["son"] for x in l) - min(x["t"] for x in l)), "satir": len(l), "kelime": w}
+    o["suflor"], o["referans"] = ozet(sf), ozet(ref)
+    a0, a1 = max(sf[0]["t"], ref[0]["t"]), min(sf[-1]["son"], ref[-1]["son"])  # ortak aralık: ölçüler yalnız burada
+    o["ortak_aralik"] = {"ilk": rd_saat(a0), "son": rd_saat(a1), "sn": round(max(a1 - a0, 0))}
+    if a1 <= a0: o["hata"] = "ortak aralık yok"; return o
+    rin = [r for r in ref if a0 <= r["t"] <= a1]; sin = [r for r in sf if a0 <= r["t"] <= a1]
+    # kapsam
+    rdk = {int(r["t"] // 60) for r in rin}; sdk = {int(r["t"] // 60) for r in sin}
+    o["kapsam"] = {"referans_dakika": len(rdk), "suflor_da_olan": len(rdk & sdk), "oran": round(len(rdk & sdk) / len(rdk), 3) if rdk else 0.0, "aralik_disi_referans_satiri": len(ref) - len(rin)}
+    # boşluklar
+    bos, son = [], a0
+    for r in sin + [{"t": a1, "son": a1}]:
+        if r["t"] - son >= 60:
+            kw = sum(len(x["w"]) for x in ref if son <= x["t"] < r["t"])
+            if kw: bos.append({"ilk": rd_saat(son), "son": rd_saat(r["t"]), "sn": round(r["t"] - son), "referans_kelime": kw})
+        son = max(son, r["son"])
+    bos.sort(key=lambda b: -b["referans_kelime"]); o["bosluklar"] = bos[:10]; o["bosluk_sayisi"] = len(bos)
+    # yazı benzerliği: 60 sn pencereler
+    pen = []; t = a0
+    while t < a1:
+        rw = [w for r in rin if t <= r["t"] < t + 60 for w in r["w"]]; sw = [w for r in sin if t <= r["t"] < t + 60 for w in r["w"]]
+        if len(rw) >= 5:
+            sm = difflib.SequenceMatcher(None, rw, sw, autojunk=False).ratio() if sw else 0.0
+            c = sum((collections.Counter(rw) & collections.Counter(sw)).values())
+            f1 = 2 * c / (len(rw) + len(sw)) if (rw or sw) else 0.0
+            pen.append({"saat": rd_saat(t), "uyus": round(sm, 3), "f1": round(f1, 3), "referans_kelime": len(rw), "suflor_kelime": len(sw)})
+        t += 60
+    med = lambda l: sorted(l)[len(l) // 2] if l else 0.0
+    o["benzerlik"] = {"pencere": len(pen), "uyus_ortanca": med([p["uyus"] for p in pen]), "f1_ortanca": med([p["f1"] for p in pen]), "en_kotu": sorted(pen, key=lambda p: p["uyus"])[:5]}
+    # uydurma adayları
+    bas = [r["t"] for r in ref]; mx, c = [], 0.0
+    for r in ref: c = max(c, r["son"]); mx.append(c)
+    ref_yok, kalip, tekrar, disarda = set(), set(), set(), 0
+    for i, r in enumerate(sf):
+        if r["t"] < ref[0]["t"] - 15 or r["son"] > ref[-1]["son"] + 15: disarda += 1; continue
+        j = bisect.bisect_right(bas, r["son"] + 15) - 1
+        if j < 0 or mx[j] < r["t"] - 15: ref_yok.add(i)
+    for i, r in enumerate(sf):
+        if RD_UYDURMA.search(r["metin"]): kalip.add(i)
+    i = 0; nm = [" ".join(r["w"]) for r in sf]
+    while i < len(sf):
+        j = i
+        while j + 1 < len(sf) and nm[j + 1] == nm[i] and nm[i] and len(sf[i]["w"]) <= 6: j += 1
+        if j - i + 1 >= 3: tekrar.update(range(i, j + 1))
+        i = j + 1
+    tum = sorted(ref_yok | kalip | tekrar)
+    o["uydurma"] = {"referansta_karsiligi_yok": len(ref_yok), "kalip": len(kalip), "tekrar": len(tekrar), "toplam": len(tum), "referans_araligi_disinda_atlanan": disarda,
+                    "ornek": [{"saat": rd_saat(sf[i]["t"]), "metin": sf[i]["metin"][:40]} for i in tum[:5]]}
+    # konuşmacı uyuşması
+    cift = collections.Counter(); room = 0
+    for r in sin:
+        if not r["w"]: continue
+        j0 = bisect.bisect_left(bas, r["t"] - 10); en, ek = 0.0, None
+        sw = set(r["w"])
+        while j0 < len(ref) and ref[j0]["t"] <= r["son"] + 10:
+            rw = set(ref[j0]["w"]); u = len(sw & rw) / max(len(sw | rw), 1)
+            if u > en: en, ek = u, ref[j0]
+            j0 += 1
+        if ek is None or en < 0.2: continue
+        if ek["kisi"].strip().lower() in RD_YOK or not ek["kisi"].strip(): room += 1; continue
+        cift[(r["kisi"], ek["kisi"])] += 1
+    esle, kul_s, kul_r = {}, set(), set()
+    for (sa, ra), n in cift.most_common():
+        if sa in kul_s or ra in kul_r: continue
+        esle[sa] = ra; kul_s.add(sa); kul_r.add(ra)
+    top = sum(cift.values()); dogru = sum(n for (sa, ra), n in cift.items() if esle.get(sa) == ra)
+    kar = [{"suflor": sa, "referans": ra, "n": n} for (sa, ra), n in cift.most_common() if esle.get(sa) != ra][:3]
+    o["konusmaci"] = {"eslesen_cift": top, "belirsiz_referans_cift": room, "uyusma": round(dogru / top, 3) if top else None, "eslesme": esle, "en_cok_karisan": kar}
+    o["dil"] = {"suflor": rd_dil([r["metin"] for r in sf]), "referans": rd_dil([r["metin"] for r in ref])}
+    return o
+def referans_dokum_cmd():
+    import shutil
+    if not os.path.isfile(A.dosya): sys.exit(f"referans dosyası yok: {A.dosya}")
+    ham = open(A.dosya, "rb").read(); icerik = ham.decode("utf-8", "replace")
+    if A.toplanti:
+        md = re.sub(r"\.(md|jsonl)$", "", os.path.basename(A.toplanti)) + ".md"
+    else: md = toplanti_dosyasi()
+    if not md or not os.path.exists(os.path.join(A.dir, md[:-3] + ".jsonl")): sys.exit(f"Suflor dökümü (.jsonl) bulunamadı: {md or 'toplantı yok'} ({A.dir})")
+    kok = md[:-3]; sf = rd_suflor(md)
+    if not sf: sys.exit("Suflor dökümü boş")
+    kaynak = A.kaynak or rd_tahmin(icerik)
+    ref, atla, mutlak = rd_ayristir(icerik, kaynak, sf[0]["t"])
+    if not ref: sys.exit(f"referansta konuşma satırı bulunamadı (kaynak {kaynak}; tanınmayan satır {atla})")
+    kok_dir = os.path.expanduser(A.cikti or A.dir); rd = os.path.join(kok_dir, "referans")
+    os.makedirs(rd, mode=0o700, exist_ok=True); os.chmod(rd, 0o700)
+    dosya_yaz_esz(os.path.join(rd, f"{kok}.{kaynak}.txt"), ham, izin=0o600)
+    dosya_yaz_esz(os.path.join(rd, f"{kok}.{kaynak}.jsonl"), "".join(json.dumps({"t": r["t"], "kisi": r["kisi"], "metin": r["metin"]}, ensure_ascii=False) + "\n" for r in ref), izin=0o600)
+    h = rd_hizala(ref, sf, mutlak)
+    zayif = (h is None) or h["oran"] < 0.08 or h["puan"] < 1.5 * max(h["ortanca_puan"], 1)
+    if zayif:
+        msg = f"hizalanamadı (kaynak {kaynak}; en iyi örtüşme {h['oran']:.0%}, ortanca {h['ortanca_puan']}/{h['puan']}): ölçü yazılmadı" if h else "hizalanamadı: karşılaştırılacak kelime yok"
+        if A.json: print(json.dumps({"hata": "hizalanamadi", "ayrinti": h}, ensure_ascii=False))
+        else: print(msg)
+        sys.exit(1)
+    o = rd_olc(ref, sf, h["kaydirma"]); o.update({"toplanti": kok, "kaynak": kaynak, "tanimayan_satir": atla, "tarih": datetime.date.today().isoformat(),
+                                                "hizalama": {"guven_oran": h["oran"], "puan": h["puan"], "ortanca_puan": h["ortanca_puan"], "kelime": h["kelime"], "mutlak_kaynak": mutlak}})
+    dosya_yaz_esz(os.path.join(rd, f"{kok}.kiyas.json"), o, izin=0o600, ensure_ascii=False, indent=1)
+    tr = os.path.join(kok_dir, "referans-kiyas.jsonl"); eski = []
+    try: eski = [l for l in open(tr, encoding="utf-8").read().splitlines() if l.strip()]
+    except OSError: pass
+    def _ayni(l):
+        try: d = json.loads(l); return d.get("kok") == kok and d.get("kaynak") == kaynak
+        except ValueError: return False
+    sat = {"tarih": o["tarih"], "kok": kok, "kaynak": kaynak, "kapsam": o.get("kapsam", {}).get("oran"), "benzerlik_ortanca": o.get("benzerlik", {}).get("uyus_ortanca"),
+           "uydurma": o.get("uydurma", {}).get("toplam"), "konusmaci_uyusma": o.get("konusmaci", {}).get("uyusma"), "kaydirma_sn": o["kaydirma_sn"]}
+    dosya_yaz_esz(tr, "".join(l + "\n" for l in [x for x in eski if not _ayni(x)] + [json.dumps(sat, ensure_ascii=False)]), izin=0o600)
+    if A.json: print(json.dumps(o, ensure_ascii=False, indent=1)); return
+    rf, su, kp, bn, u, ks, dl = o["referans"], o["suflor"], o.get("kapsam", {}), o.get("benzerlik", {}), o.get("uydurma", {}), o.get("konusmaci", {}), o.get("dil", {})
+    print(f"Referans karşılaştırması: {kok} · kaynak {kaynak} · {len(ref)} referans satırı ({atla} tanınmayan satır atlandı)")
+    print(f"Hizalama: referans saati Suflor'a göre {o['kaydirma_sn']:+.0f} sn; güven: referans kelimelerinin %{h['oran'] * 100:.0f}'i ±10 sn içinde Suflor'da (ortanca tarama puanı {h['ortanca_puan']} ↔ en iyi {h['puan']})")
+    print(f"Süre: Suflor {su['ilk']}–{su['son']} ({su['satir']} satır, {su['kelime']} kelime) · referans {rf['ilk']}–{rf['son']} ({rf['satir']} satır, {rf['kelime']} kelime) · ortak aralık {o['ortak_aralik']['sn'] // 60} dk")
+    print(f"Kapsam: referansta konuşma olan {kp.get('referans_dakika')} dakikanın {kp.get('suflor_da_olan')}'inde Suflor'da da satır var (%{kp.get('oran', 0) * 100:.0f})")
+    if o["bosluklar"]:
+        print(f"Boşluklar (referansta konuşma varken Suflor'da ≥60 sn satır yok): {o['bosluk_sayisi']}; en büyükler: " + "; ".join(f"{b['ilk']}–{b['son']} ({b['referans_kelime']} kelime)" for b in o["bosluklar"][:3]))
+    else: print("Boşluklar: yok")
+    print(f"Yazı uyuşması (60 sn pencere, {bn.get('pencere')} pencere): kelime dizisi uyuşması ortanca {bn.get('uyus_ortanca', 0):.2f}, kelime örtüşmesi F1 ortanca {bn.get('f1_ortanca', 0):.2f}; en zayıf: " + ", ".join(f"{p['saat']} ({p['uyus']:.2f})" for p in bn.get("en_kotu", [])))
+    print(f"Uydurma adayı: {u.get('toplam')} (referansta karşılığı yok {u.get('referansta_karsiligi_yok')}, bilinen kalıp {u.get('kalip')}, art arda tekrar {u.get('tekrar')})" + ("; ilkler: " + " | ".join(f"{e['saat']} {e['metin']}" for e in u.get("ornek", [])) if u.get("ornek") else ""))
+    if ks.get("uyusma") is None: print("Konuşmacı: eşleşen satır çifti yok")
+    else: print(f"Konuşmacı uyuşması: %{ks['uyusma'] * 100:.0f} ({ks['eslesen_cift']} çift; belirsiz/ortam {ks['belirsiz_referans_cift']}); en sık karışan: " + (", ".join(f"{x['suflor']} → {x['referans']} ×{x['n']}" for x in ks["en_cok_karisan"]) or "yok"))
+    d1, d2 = dl["suflor"], dl["referans"]
+    print(f"Dil: Suflor satırları Türkçe %{d1['satir_dagilim']['tr'] * 100:.0f} / İngilizce %{d1['satir_dagilim']['en'] * 100:.0f} (Türkçe karakter %{d1['tr_karakter_oran'] * 100:.1f}); referans Türkçe %{d2['satir_dagilim']['tr'] * 100:.0f} / İngilizce %{d2['satir_dagilim']['en'] * 100:.0f}")
+    print(f"Yazıldı: {rd}/{kok}.kiyas.json · eğilim: {tr}")
+
 try:
     {"kart": kart, "hazir": hazir, "izle": izle, "olcum": olcum, "ara": ara_cmd, "sozluk": sozluk_cmd, "acik": acik_cmd, "soz": soz_cmd, "eylem": eylem_cmd, "gundem": gundem_cmd,
      "kanit": kanit_cmd, "sonuc": sonuc_cmd, "hazirlik": hazirlik_cmd, "etiket": etiket_cmd,
      "saglik": saglik_cmd, "takvim": takvim_cmd, "kisi": kisi_cmd, "katilimcilar": katilimcilar_cmd, "tazi": tazi_cmd, "kapanis": kapanis_cmd, "rapor": rapor_cmd, "dokum": dokum_cmd, "geri-bildirim": geri_bildirim_cmd, "gelen": gelen_cmd, "ilet": ilet_cmd, "izin-kanca": izin_kanca_cmd, "ozet-hazir": ozet_hazir_cmd, "durum": durum_cmd,
-     "ekranlar": adimlar_cmd, "adimlar": adimlar_cmd, "konusmaci": konusmaci_cmd, "hafiza": hafiza_cmd, "yapi": yapi_cmd, "graf": graf_cmd, "kisi-es": kisi_es_cmd, "bitir": bitir_cmd, "posta-uslup": posta_uslup_cmd, "vt-sema": vt_sema_cmd, "vt-sor": vt_sor_cmd, "proje": proje_cmd, "proje-notu": proje_notu_cmd, "profil-guncelle": profil_guncelle_cmd, "vt-mcp": vt_mcp_cmd, "vt-izle": vt_izle_cmd, "maliyet": maliyet_cmd}[A.cmd]()
+     "ekranlar": adimlar_cmd, "adimlar": adimlar_cmd, "konusmaci": konusmaci_cmd, "hafiza": hafiza_cmd, "yapi": yapi_cmd, "graf": graf_cmd, "kisi-es": kisi_es_cmd, "bitir": bitir_cmd, "posta-uslup": posta_uslup_cmd, "vt-sema": vt_sema_cmd, "vt-sor": vt_sor_cmd, "proje": proje_cmd, "proje-notu": proje_notu_cmd, "profil-guncelle": profil_guncelle_cmd, "vt-mcp": vt_mcp_cmd, "vt-izle": vt_izle_cmd, "maliyet": maliyet_cmd, "referans-dokum": referans_dokum_cmd}[A.cmd]()
 except KeyboardInterrupt: pass
