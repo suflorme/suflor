@@ -1738,14 +1738,32 @@ def _ad_gercek(ad):  # yer tutucu ad, kullanıcının kendisi ya da boş → Non
 def _esleme_yol(md): return os.path.join(A.dir, md[:-3] + ".konusmaci.json")
 def ad_uygula(md, rs):
     # satırın adı = süreye göre çoğunluk kişi (karne, koç, pay); iki kişili satır (bölümleri farklı kişide) "_bol" taşır, döküm onu böler
+    # v0.255.0: en sonda görünen ad (Meet/Teams adı) → gerçek ad (gercek_ad_coz: elle kisi-es > kayıt veritabanı kisi_takma); yalnız toplantı sonrası okuyucular
     rs = elle_uygula(md, rs)
     try: v = json.load(open(_esleme_yol(md), encoding="utf-8")); es = v.get("ad") or {}; bol = v.get("bol") or {}
-    except (OSError, ValueError): return rs
+    except (OSError, ValueError): es, bol = {}, {}
     for r in rs:
         if "text" not in r: continue
         if r.get("id") in es and r.get("speaker") != es[r["id"]]: r["speaker_canli"] = r.get("speaker"); r["speaker"] = es[r["id"]]
-        if r.get("id") in bol: r["_bol"] = bol[r["id"]]
+        if r.get("id") in bol: r["_bol"] = [dict(b, ad=gercek_ad_coz(b.get("ad"))) for b in bol[r["id"]]]
+        g = gercek_ad_coz(r.get("speaker"))
+        if g != r.get("speaker"): r.setdefault("speaker_canli", r.get("speaker")); r["speaker"] = g
     return rs
+_AD_COZ = []
+def gercek_ad_coz(ad):
+    # görünen ad → gerçek ad (baglayici.gorunen_ad_cozucu; süreç başına bir kez kurulur). Elle eş ad karar grafından (kisi-es), takma adlar kayıt
+    # veritabanından (yalnız SqliteKayit; yoksa/okunamazsa yalnız kisi-es). Kullanıcının kendisi ve yer tutucu etiketler değişmez.
+    if not _AD_COZ:
+        es, Y = {}, None
+        if os.path.exists(os.path.join(A.dir, "karar-grafi.sqlite")):
+            try:
+                Y = _yapi(); c = Y._db(A.dir)
+                try: es = Y.kisi_es_oku(c)
+                finally: c.close()
+            except Exception: es = {}
+        satir = _BAG._calistir if isinstance(_BAG, baglayici.SqliteKayit) else None
+        _AD_COZ.append(baglayici.gorunen_ad_cozucu(satir, (lambda a: Y.kisi_ad(es, a)) if es else None, ben=(BEN, AYAR.get("ad"))))
+    return _AD_COZ[0](ad)
 # Elle döküm kontrolü (13 Kasım): kullanıcının dinleyip düzelttiği metin (<ses-arsivi>/<toplantı>/duzeltme-elle.json: ses dosyası → doğru metin,
 # aktarici/dokum-kontrol.py "Bitir") konuşmacı eşlemesi gibi okuma anında satıra işlenir; .md/.jsonl değişmez. Böylece temiz döküm, özet, karar
 # ve işler düzeltilmiş metinden çıkar. Satır ses dosyasına parcalar.jsonl'daki t0 ile bağlanır; düzeltme boşsa satır düşer (uydurma), satırı

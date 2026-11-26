@@ -20,11 +20,11 @@
   "katman": "A"
  },
  "test/bellek.py": {
-  "sure": 0.2,
+  "sure": 0.3,
   "katman": "A"
  },
  "test/brifing-izin.py": {
-  "sure": 8.5,
+  "sure": 9.2,
   "katman": "A"
  },
  "test/brifing-oku.py": {
@@ -44,7 +44,7 @@
   "katman": "A"
  },
  "test/calisma.py": {
-  "sure": 2.1,
+  "sure": 2.5,
   "katman": "A"
  },
  "test/defter.py": {
@@ -56,7 +56,7 @@
   "katman": "A"
  },
  "test/derle.py": {
-  "sure": 2.9,
+  "sure": 3.6,
   "katman": "A"
  },
  "test/dil-kilit.py": {
@@ -80,7 +80,7 @@
   "katman": "A"
  },
  "test/eposta-yeterdi.py": {
-  "sure": 0.0,
+  "sure": 0.1,
   "katman": "A"
  },
  "test/gemini-gecis.py": {
@@ -88,7 +88,7 @@
   "katman": "A"
  },
  "test/gomme-sikistir.py": {
-  "sure": 0.3,
+  "sure": 0.4,
   "katman": "A"
  },
  "test/guncellik.py": {
@@ -124,7 +124,7 @@
   "katman": "A"
  },
  "test/istem-sira.py": {
-  "sure": 2.9,
+  "sure": 3.0,
   "katman": "A"
  },
  "test/kapi-olcum.py": {
@@ -136,7 +136,7 @@
   "katman": "A"
  },
  "test/kart-oncelik.py": {
-  "sure": 0.2,
+  "sure": 0.1,
   "katman": "A"
  },
  "test/katilimci-tanima.py": {
@@ -156,7 +156,7 @@
   "katman": "A"
  },
  "test/konus-anlik.py": {
-  "sure": 2.0,
+  "sure": 1.9,
   "katman": "A"
  },
  "test/konus-baglam.py": {
@@ -164,7 +164,7 @@
   "katman": "A"
  },
  "test/konus-ses-yardimci.py": {
-  "sure": 16.7,
+  "sure": 16.3,
   "katman": "A"
  },
  "test/konus-yuva.py": {
@@ -200,7 +200,7 @@
   "katman": "A"
  },
  "test/pano-sozdizimi.py": {
-  "sure": 4.8,
+  "sure": 5.0,
   "katman": "A"
  },
  "test/posta-dizini.py": {
@@ -229,15 +229,15 @@
   "katman": "A"
  },
  "test/ses-arsivi-tam.py": {
-  "sure": 38.7,
+  "sure": 38.6,
   "katman": "A"
  },
  "test/ses-duzen.py": {
-  "sure": 1.6,
+  "sure": 1.7,
   "katman": "A"
  },
  "test/ses-kuyruk.py": {
-  "sure": 5.7,
+  "sure": 5.6,
   "katman": "A"
  },
  "test/sesli-terim.py": {
@@ -245,11 +245,15 @@
   "katman": "A"
  },
  "test/so-yaz-esz.py": {
-  "sure": 1.0,
+  "sure": 0.8,
   "katman": "A"
  },
  "test/surec-yenileme.py": {
   "sure": 0.1,
+  "katman": "A"
+ },
+ "test/takma-ad.py": {
+  "sure": 0.5,
   "katman": "A"
  },
  "test/takvim-bekle.py": {
@@ -257,7 +261,7 @@
   "katman": "A"
  },
  "test/takvim-suzgec.py": {
-  "sure": 16.6,
+  "sure": 17.0,
   "katman": "A"
  },
  "test/tara.py": {
@@ -285,11 +289,11 @@
   "katman": "A"
  },
  "test/yanki.py": {
-  "sure": 0.0,
+  "sure": 0.1,
   "katman": "A"
  },
  "test/yerel-konus.py": {
-  "sure": 21.2,
+  "sure": 21.1,
   "katman": "A"
  },
  "test/yerel-ses-ayar.py": {
@@ -297,7 +301,7 @@
   "katman": "A"
  },
  "test/yetim-surec.py": {
-  "sure": 11.3,
+  "sure": 11.4,
   "katman": "A"
  },
  "test/zeka-altin.py": {

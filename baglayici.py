@@ -470,3 +470,47 @@ def kimlik_esle(h, ad, alanlar=(), izler=()):
     if not kisi and len(n) >= 4: kisi = h["ad"].get(n)
     alan = next((alan_norm(a) for a in alanlar or [] if alan_norm(a) in h["firma"]), None)
     return kisi, alan
+# --- görünen ad → gerçek ad (v0.255.0, 26 Kasım): toplantı sonrası çıktılarda (temiz döküm, karne, koç…) konuşmacının Meet/Teams görünen adı kişinin
+# kayıttaki adına çevrilir. Kaynak: kisi_takma (yalnız TEK kişiye çıkan, kesin takma ad) + çağıranın elle eş adı (kisi-es, önce gelir). Canlı akış kullanmaz.
+TAKMA_ROL_RX = re.compile(r"^[A-ZÇĞİÖŞÜ0-9&/.\-]{2,6}$")               # tamamı büyük harf kısa kısaltma (CMO, CEO, IT): rol/unvan, ad değil
+TAKMA_SUPHE_RX = re.compile(r"muhtemel|teyitsiz", re.I)                   # bağlamı kesin olmayan takma ad ("görünen adı; kişinin adı değil" tam aradığımız: sistemdeki görünen ad)
+GORUNEN_YER_RX = re.compile(r"^(?:(karşı taraf|konuşmacı|speaker|unknown|bilinmeyen|katılımcı)\b|(you|siz|ben|odadaki kişi|claude|suflor(\.me)?)$)", re.I)  # asistan/bot adları da (kayıtta "Claude" bir kişinin takma adı olabilir)
+def takma_ad_haritasi(satir):
+    """→ ({ad_norm(takma ad): kişinin kayıttaki adı}, {eleme nedeni: sayı}). satir(sql) → satırlar (SqliteKayit._calistir); okunamazsa boş.
+    Birden çok kişiye çıkan ad (kuşkulu takma adlar ve başka kişinin asıl adı da sayılır) atlanır; kişinin kendi adıyla aynı olan takma ad eşleme üretmez."""
+    kisiler = {kid: " ".join(str(ad).split()) for kid, ad in satir("SELECT id, ad FROM kisi WHERE coalesce(durum,'') <> 'Birleştirildi'") if ad and str(ad).strip()}
+    sahip, gecerli, elenen = {}, set(), {}
+    def ele(n): elenen[n] = elenen.get(n, 0) + 1
+    for kid, ad in kisiler.items(): sahip.setdefault(ad_norm(ad), set()).add(kid)
+    for kid, ad, baglam in satir("SELECT kisi_id, ad, baglam FROM kisi_takma"):
+        a = " ".join(str(ad or "").split()); n = ad_norm(a)
+        if kid not in kisiler: ele("birleştirilmiş ya da kişisi yok"); continue
+        if not a or "@" in a: ele("e-posta ya da boş"); continue
+        sahip.setdefault(n, set()).add(kid)  # kuşkulu da olsa belirsizlik sayımına girer
+        if TAKMA_ROL_RX.match(a): ele("rol/unvan kısaltması")
+        elif TAKMA_SUPHE_RX.search(str(baglam or "")): ele("muhtemel/teyitsiz/ad değil")
+        elif len(n) < 3: ele("çok kısa")
+        elif len(a.split()) < 2: ele("tek sözcük")  # Meet/Teams görünen adı ad + soyad(ın baş harfi); tek sözcüklü ad başka kişinin kısaltılmış adı olabilir — elle kisi-es ile
+        else: gecerli.add((n, kid))
+    harita = {}
+    for n, kid in gecerli:
+        if len(sahip.get(n, ())) > 1: ele("birden çok kişiye çıkıyor")
+        elif ad_norm(kisiler[kid]) == n: ele("kişinin kendi adı")
+        else: harita[n] = kisiler[kid]
+    return harita, elenen
+def gorunen_ad_cozucu(satir=None, kisi_es=None, ben=()):
+    """→ coz(görünen ad) → gerçek ad. Öncelik: kisi_es(ad) (elle eş ad; ad ya da aynısını döner) > kisi_takma > dokunma.
+    Yer tutucu etiketler (Karşı taraf n, Bilinmeyen konuşmacı, You…) ve kullanıcının kendisi (ben: ad listesi; ilk sözcük eşleşmesi) değişmez.
+    satir None ya da veritabanı okunamazsa yalnız kisi_es ile çalışır (beta kullanıcısında kayıt veritabanı yok)."""
+    try: harita = takma_ad_haritasi(satir)[0] if satir else {}
+    except Exception: harita = {}
+    ilk = {ad_norm(str(b).split()[0]) for b in ben if b and str(b).split()}
+    def coz(ad):
+        a = " ".join(str(ad or "").split())
+        if not a or a == "?" or GORUNEN_YER_RX.match(a) or ad_norm(a.split()[0]) in ilk: return ad
+        if kisi_es:
+            try: e = kisi_es(a)
+            except Exception: e = None
+            if e and e != a: return e
+        return harita.get(ad_norm(a), ad)
+    return coz
