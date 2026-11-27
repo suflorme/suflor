@@ -29,11 +29,43 @@ def veri_yok_view():
     if not _VY["yazildi"]:
         _VY["yazildi"] = True; print(f"VERİ YOK: toplantı sürüyor ama {round(sn)} sn'dir satır gelmiyor (altyazı {kanallar['altyazi']}, ben {kanallar['ben']}, karşı {kanallar['karsi']}, whisper {kanallar['whisper']})")
     return {"sn": round(sn), "kanallar": kanallar}
+# v0.255.1 (beta #89/#90, 25 Kasım 93 dk Meet): karşı tarafın sesi akarken kullanıcının mikrofonu ("ben") 78 dk hiç yazılmadı, kimse fark etmedi
+# (veri_yok yalnız hiçbir kanal akmıyorsa uyarır). Toplantı tarayıcıda sürerken (eklenti sekmesi ya da yerel ses yardımcısı bir tarayıcıyı dinliyor;
+# masaüstü toplantı değil) BEN_KOPUK_SN boyunca mikrofon kanalı bağlı değilse — eklentiden mikrofon bilgisi yok (betik kopuk / toplantı eklentisiz
+# tarayıcıda), mikrofon açılamadı ya da açık ama ses parçası gelmiyor — /status ben_kopuk {sn, neden, uygulama} döner (STATE üzerinden), günlüğe
+# bir kez yazılır, pano ve mini pano kırmızı uyarı gösterir; kanal düzelince kalkar. Konuşmamak sorun değil: mikrofon açıkken sessizlikte de
+# parça akar (ben_kod "akiyor"); sessize almak ("sessiz") ve Whisper'ı kapatmak ("kapali") uyarı değil. Altyazı akıyorsa ("ben" altyazıdan) yok.
+BEN_KOPUK_SN = 8 if os.environ.get("SUFLOR_TEST_HIZLI") else 120
+TARAYICILAR = ("Safari", "Google Chrome", "Chrome", "Firefox", "Microsoft Edge", "Arc", "Brave Browser", "Opera", "Vivaldi", "Chromium")
+_BK = {"bas": None, "yazildi": False}
+def _ben_kopuk_neden():  # → (kod, uygulama) ya da None (kanal bağlı / uyarılacak durum değil)
+    if not toplanti_suruyor() or ("masaustu_toplantida" in globals() and masaustu_toplantida()): return None
+    if (STATE.get("whisper") or {}).get("durum") in (None, "yok") or kanal_akiyor("altyazi", 180): return None
+    kod = ben_kod() if "ben_kod" in globals() else "yok"
+    if kod not in ("yok", "hata", "sorun"): return None
+    ek = eklenti_sayfa() if "eklenti_sayfa" in globals() else None
+    ya = str((STATE.get("yerel_ses") or {}).get("uygulama") or "")
+    tarayici = ya if ya in TARAYICILAR and yerel_ses_durum() in ("dinliyor", "bekliyor", "izin") else ""
+    if not ek and not tarayici: return None  # tarayıcıda toplantı izi yok (yüz yüze, telefon, masaüstü uygulama): eklentinin işi değil
+    if kod == "yok" and not ek and tarayici and tarayici not in ("Google Chrome", "Chrome"): return ("tarayici", tarayici)
+    return (kod if kod != "yok" else "sekme", tarayici or "Chrome")
+def ben_kopuk_view():
+    now = time.time(); n = _ben_kopuk_neden()
+    if not n:
+        if _BK["yazildi"]: print(f"MİKROFON KANALI: düzeldi ({round(now - _BK['bas'])} sn kopuk kaldı)")
+        _BK.update(bas=None, yazildi=False); return None
+    if _BK["bas"] is None: _BK["bas"] = now
+    sn = now - _BK["bas"]
+    if sn < BEN_KOPUK_SN: return None
+    if not _BK["yazildi"]: _BK["yazildi"] = True; print(f"MİKROFON KANALI: kopuk — {round(sn)} sn'dir senin sesin yazılmıyor (neden {n[0]}, uygulama {n[1]})")
+    return {"sn": round(sn), "neden": n[0], "uygulama": n[1]}
 def _veri_yok_dongu():  # /status yoklanmasa da günlüğe yazılsın
     while True:
         time.sleep(2 if os.environ.get("SUFLOR_TEST_HIZLI") else 5)
         try: veri_yok_view()
         except Exception as e: print(f"VERİ YOK: bakılamadı ({e.__class__.__name__})")
+        try: STATE["ben_kopuk"] = ben_kopuk_view()  # /status dict(STATE) ile pano ve mini panoya gider
+        except Exception as e: STATE["ben_kopuk"] = None; print(f"MİKROFON KANALI: bakılamadı ({e.__class__.__name__})")
 
 def _kurulum_py():  # → (yol, cwd, ek_ortam): launchd altında Masaüstü'ndeki kod klasörü AÇILAMAZ (stat çalışır, open çalışmaz); o zaman uygulama klasöründeki kopya (aktarici-kur KOPYA'da)
     k = _kod_dir()

@@ -895,7 +895,7 @@ def _isci_dongu():
         w["istem_dusen"] = j.get("istem_dusen", 0)
         w["durgun_max"] = max(w.get("durgun_max") or 0, round(is_["t_wh"] - is_["t_al"], 1))  # tek parçanın en uzun işçi süresi (6 Ekim: 47 sn tıkanma)
         sonuc = "uydurma" if j.get("atlanan") else "bos"
-        if metin and is_.get("dil_kilit") and dk_cokme(metin, j.get("lp"), j.get("kp")): print(f"WHISPER: dil kilidi şüphesi ({is_.get('kanal')} kanalı, '{metin}' lp {j.get('lp')} kp {j.get('kp')}) — metin boş bırakıldı"); metin = ""; is_["kilit_supheli"] = True
+        if metin and is_.get("dil_kilit") and dk_cokme(metin, j.get("lp"), j.get("kp")): print(f"WHISPER: dil kilidi şüphesi ({is_.get('kanal')} kanalı, '{metin}' lp {j.get('lp')} kp {j.get('kp')} süre {round(is_.get('t1', 0) - is_.get('t0', 0), 2)} sn) — metin boş bırakıldı")  # 27 Kasım: süre eşik ölçümü için; metin = ""; is_["kilit_supheli"] = True
         if j.get("atilan"):  # süzgecin attığı metin (v0.32.12): uydurma listesini kendi kayıtlarımızdan büyütmek için; yalnız bu Mac'te, döndürülür
             try: _log("uydurma-adaylari.jsonl", {"t": round(time.time(), 1), "kanal": is_.get("kanal"), "atilan": j["atilan"], "satir": bool(metin)})
             except Exception: pass
@@ -1439,7 +1439,8 @@ def _karsi_bekleniyor(t0, t1):
     k = KANALLAR.get("karsi")
     if k and k.konusuyor and k.t0 < t1: return True
     with WH_Q.mutex: q = list(WH_Q.queue)
-    return any(x["kanal"] == "karsi" and min(x["t1"], t1) - max(x["t0"], t0) >= 0.5 for x in q)
+    # beta #78: kuyrukta iki tür öğe var (ses parçası ve {"isinma": True, ...} ısınma öğesi); ısınma öğesinde kanal/t0/t1 yok
+    return any(x.get("kanal") == "karsi" and not x.get("isinma") and min(x.get("t1", 0), t1) - max(x.get("t0", 0), t0) >= 0.5 for x in q)
 def _yanki_say(metin, ses=False):
     STATE["whisper"]["yanki"] += 1; n = STATE["whisper"]["yanki"]
     if "beta_olay" in globals(): beta_olay("yanki")  # v0.238.3: toplantı başına yankı sayısı (beta_kalite; kulaklıksız toplantı işareti) — yalnız sayaç, metin yok

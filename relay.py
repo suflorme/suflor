@@ -91,7 +91,8 @@ except Exception: teshis = None
 # deneme aktarıcısı (başka klasör ya da port: test/, Hızlı test) gerçek adrese göndermez — teshis.acik() yalnız yerel alıcıya izin verir
 if teshis and (os.path.realpath(BASE) != os.path.realpath(os.path.join(AYAR["uygulama"], "canli")) or A.port != int(AYAR["port"])): teshis.DENEME = True
 _SON_SATIR = collections.deque(maxlen=40); _SORUN_SON = {}
-SORUN_RX = [("whisper", re.compile(r"^WHISPER: (?!hazır|işçi kapatıldı)")),
+# beta #74/#68: "WHISPER: istem sınırı …" ve "dil kilidi şüphesi …" bilinçli kuralların bilgi satırıdır, sorun değil (günlükte kalır)
+SORUN_RX = [("whisper", re.compile(r"^WHISPER: (?!hazır|işçi kapatıldı|istem sınırı|dil kilidi şüphesi)")),
             ("disk", re.compile(r"^DİSK: (yazılamadı|az yer)")), ("eklenti", re.compile(r"^EKLENTİ: .*(açılamadı|hata|yanıt vermiyor)")),
             ("nabiz", re.compile(r"^EKLENTİ: nabız (\d{3,}|[6-9]\d) sn")), ("takvim", re.compile(r"^TAKVİM: hata")),
             ("baslat", re.compile(r"^BAŞLAT: .*hata")), ("sozluk", re.compile(r"^SÖZLÜK: okunamadı"))]

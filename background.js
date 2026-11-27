@@ -255,18 +255,57 @@ chrome.runtime.onInstalled.addListener(() => takvimBak()); chrome.runtime.onStar
 // nabız yedeği: 3 Ekim denemesinde Teams sekmesinin nabzı ~7 dk kesildi (mikrofon sesi akarken). 30 sn'de bir her
 // toplantı sekmesinin üst çerçevesine "nabiz" mesajı; içerik betiği ping() atar (mesaj, kısılan zamanlayıcıyı beklemez).
 // Yanıt yoksa (betik yüklü değil / bağlam koptu) aktarıcı günlüğüne bir kez yazılır; sekme yeniden yanıt verince yine.
+// v0.255.1 (beta #89/#90): yüklenmekte olan sekme atlanır (25 Kasım 23:40: yeni açılan Meet sayfasında betik document_idle'ı beklerken
+// "Receiving end does not exist" yanlış alarmdı). Yüklenmiş sekme art arda iki yoklamada (≥30 sn) yanıt vermezse içerik betiği ve platform
+// dosyası manifest sırasıyla o sekmeye yeniden yüklenir (eklenti güncellendi/yeniden yüklendi, sekme eskisinden kaldı). Sekme yenilenmez
+// (toplantı bölünür); yükleme tutmazsa günlük + panodaki "Mikrofonun yazılmıyor" uyarısı (aktarici/saglik.py ben_kopuk).
 chrome.alarms.create("nabiz", { periodInMinutes: 0.5 });
-const sessizSekme = new Set();
+const sessizSekme = new Set(), nabizHata = new Map(), yuklemeDenendi = new Map();
+const YUKLEME_ARA_MS = 5 * 60 * 1000;  // aynı sekmeye en çok 5 dk'da bir yeniden yükleme
+function kalipUyar(kalip, url) {  // manifest eşleme kalıbı → bu adres uyar mı (kalıpta port varsa o port; test sayfası 127.0.0.1:8797, pano 8799 değil)
+  if (kalip === "<all_urls>") return /^(https?|file):/.test(url);
+  const m = /^(\*|https?|file):\/\/([^/]*)(\/.*)$/.exec(kalip); if (!m) return false;
+  const rx = s => s.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*");
+  const host = m[2], hostRx = host === "*" ? "[^/]*" : host.startsWith("*.") ? "([^/]*\\.)?" + rx(host.slice(2)) : rx(host);
+  return new RegExp("^" + (m[1] === "*" ? "https?" : m[1]) + "://" + hostRx + (/:\d+$/.test(host) ? "" : "(:\\d+)?") + rx(m[3]) + "$").test(url);
+}
+async function betikYenidenYukle(t) {  // → yüklenen dosya sayısı; hata atarsa çağıran günlüğe yazar
+  const girdiler = chrome.runtime.getManifest().content_scripts.filter(cs => (cs.matches || []).some(k => kalipUyar(k, t.url || "")));
+  if (!girdiler.some(cs => (cs.js || []).some(j => j.startsWith("platform-")))) return 0;
+  // içerik betiğine "arka plan yeniden yüklüyor" işareti (yalıtılmış dünya): eski sürümün bayrağı ölü betikte de kalır; işaret yeni örneği kurdurur
+  await chrome.scripting.executeScript({ target: { tabId: t.id, allFrames: true }, func: () => { window.__suflorYenidenYukle = Date.now(); } }).catch(() => {});
+  let n = 0;
+  for (const cs of girdiler) {  // manifest sırası: dil.js → yerel-anahtar.js → platform-<ad>.js → content.js; sayfa bağlamındakiler (mic-main, soyle-main) kendi korumalı
+    await chrome.scripting.executeScript({ target: { tabId: t.id, allFrames: !!cs.all_frames }, files: cs.js, world: cs.world === "MAIN" ? "MAIN" : "ISOLATED", injectImmediately: true });
+    n += cs.js.length;
+  }
+  return n;
+}
+async function nabizOlay(tur, metin) { try { await fetch((await relayAdr()) + "/olay", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tur, metin }) }); } catch (e) {} }
 async function nabizYokla() {
   for (const t of await chrome.tabs.query({ url: TOPLANTI_URL })) {
-    if (t.discarded) continue;
+    if (t.discarded || t.status !== "complete") continue;  // yüklenen sekmede betik henüz yok: yanlış alarm olmasın
     const r = await chrome.tabs.sendMessage(t.id, { type: "nabiz" }, { frameId: 0 }).catch(e => ({ err: String(e && e.message || e) }));
-    const ok = !!(r && r.ok), onceki = sessizSekme.has(t.id);
+    let ok = !!(r && r.ok);
+    if (ok) nabizHata.delete(t.id); else nabizHata.set(t.id, (nabizHata.get(t.id) || 0) + 1);
+    if (!ok && nabizHata.get(t.id) >= 2 && Date.now() - (yuklemeDenendi.get(t.id) || 0) > YUKLEME_ARA_MS) {
+      yuklemeDenendi.set(t.id, Date.now());
+      try {
+        const n = await betikYenidenYukle(t);
+        if (n) {
+          const r2 = await chrome.tabs.sendMessage(t.id, { type: "nabiz" }, { frameId: 0 }).catch(() => null);
+          ok = !!(r2 && r2.ok); if (ok) nabizHata.delete(t.id);
+          await nabizOlay("nabiz", ok ? `betik yeniden yüklendi — toplantı sekmesi yanıt veriyor (${n} dosya)` : `betik yeniden yüklendi ama sekme yanıt vermiyor (${n} dosya)`);
+        }
+      } catch (e) { await nabizOlay("nabiz", `betik yeniden yüklenemedi (${String(e && e.message || e).slice(0, 160)})`); }
+    }
+    const onceki = sessizSekme.has(t.id);
     if (ok === !onceki || (!ok && t.id !== callTab)) continue;  // durum değişmedi; yalnız toplantıdaki sekme günlüğe yazılır
     if (ok) sessizSekme.delete(t.id); else sessizSekme.add(t.id);
-    try { await fetch((await relayAdr()) + "/olay", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tur: "nabiz", metin: ok ? "toplantı sekmesi yeniden yanıt veriyor" : `toplantı sekmesi yanıt vermiyor (${(r && r.err) || "yanıt yok"}) — sekmeyi yenile` }) }); } catch (e) {}
+    await nabizOlay("nabiz", ok ? "toplantı sekmesi yeniden yanıt veriyor" : `toplantı sekmesi yanıt vermiyor (${(r && r.err) || "yanıt yok"}) — sekmeyi yenile`);
   }
 }
+chrome.tabs.onRemoved.addListener(id => { nabizHata.delete(id); yuklemeDenendi.delete(id); sessizSekme.delete(id); });
 function surumBuyuk(a, b) { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); } return false; }
 async function takvimBak() {
   try {

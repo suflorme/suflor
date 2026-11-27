@@ -24,6 +24,9 @@ function durum(s){
   if(s.dil&&s.dil.uyari)so.push(["er",L("Döküm dili yanlış"),s.dil.uyari])
   if(s.kaynak&&s.kaynak.duzey==="kritik")so.push(["wa",L("Mac aşırı yüklü — Suflor hafif kipte"),L("boş bellek %{b} · takas {t} GB · yük {y} — toplantı işleri sürer, önceden yapılan işler beklemede",{b:s.kaynak.bos_yuzde==null?"?":s.kaynak.bos_yuzde,t:s.kaynak.takas_gb==null?"?":s.kaynak.takas_gb,y:s.kaynak.yuk==null?"?":s.kaynak.yuk})])  // C fazı: kaynak bekçisi (aktarici/kaynak.py), kritik düzey kalıcı sarı kart
   if(s.kulaklik_yok)so.push(["wa",L("Kulaklık algılanmadı — cevaplar yalnız yazılı"),L("çıkış aygıtı")+": "+s.kulaklik_yok.cihaz])  // toplantı sürerken kulaklık yok: sesli cevap, fısıltı ve sesli çeviri kapalı (aktarici/brifing-ses.py kulaklik_yok_view)
+  const bk=s.ben_kopuk  // v0.255.1 (beta #89/#90): toplantı tarayıcıda sürerken mikrofon kanalı 2 dk'dır bağlı değil (aktarici/saglik.py ben_kopuk); kanal düzelince kalkar
+  if(bk&&top)so.push(["er",bk.neden==="tarayici"?L("Mikrofonun yazılmıyor — toplantı {u} tarayıcısında açık",{u:bk.uygulama}):L("Mikrofonun yazılmıyor"),
+    bk.neden==="tarayici"?L("eklenti orada yok — Chrome'dan katıl"):bk.neden==="sorun"?L("mikrofon açık ama ses gelmiyor — toplantı sekmesini yenile"):bk.neden==="hata"?L("mikrofon açılamadı — toplantı sekmesini yenile"):L("eklenti toplantı sekmesine ulaşamıyor — sekmeyi yenile")])
   if(s.veri_yok){const v=s.veri_yok,k=v.kanallar||{}  // Faz D: toplantı sürüyor ama hiçbir kanaldan satır yok — sağlık "süreç çalışıyor" değil "veri akıyor mu"
     const A={acik:L("açık"),yok:L("yok")},B={yok:L("mikrofon bilgisi yok"),hata:L("mikrofon açılamadı"),kapali:L("mikrofon kanalı kapalı"),sessiz:L("mikrofon sessizde"),sorun:L("mikrofon açık ama ses gelmiyor")}
     const C={izin:L("ses kaydı izni yok"),yok:L("ses yardımcısı yok"),kapali:L("ses yardımcısı kapalı"),bekliyor:L("ses yardımcısı hazır, ses gelmiyor"),dinliyor:L("ses yardımcısı dinliyor, satır yok"),web:L("tarayıcı sesi, satır yok")}
@@ -42,7 +45,7 @@ function durum(s){
     else if(w.durum&&w.durum!=="yok"){
       if(w.yerel==="izin")so.push(["wa",L("Karşı tarafın sesi için izin gerekiyor"),L("Sistem Ayarları → Gizlilik ve Güvenlik → Ekran ve Sistem Sesi Kaydı → Suflor Ses")])
       else if(!w.karsi&&!x.captions&&!x.panel&&!["bekliyor","dinliyor"].includes(w.yerel))so.push(["wa",L("Karşı tarafın sesi yazılmıyor"),L("Suflor.me simgesi → Karşı taraf → Aç")])
-      if(!w.ben&&["hata","sorun"].includes(w.ben_kod))so.push(["wa",L("Senin sesin yazılmıyor"),w.ben_kod==="hata"?L("mikrofon açılamadı — toplantı sekmesini yenile"):L("mikrofon açık ama ses gelmiyor")])}
+      if(!w.ben&&!bk&&["hata","sorun"].includes(w.ben_kod))so.push(["wa",L("Senin sesin yazılmıyor"),w.ben_kod==="hata"?L("mikrofon açılamadı — toplantı sekmesini yenile"):L("mikrofon açık ama ses gelmiyor")])}
     if(!izl)so.push(["wa",L("{asistan} izlemiyor — kart gelmez"),"",L("Başlat")])}
   else if(top&&s.toplanti&&s.toplanti.durum==="suruyor"&&!izl&&!(s.toplanti.neden||"").includes("öneri"))so.push(["wa",L("{asistan} izlemiyor — kart gelmez"),"",L("Başlat")])  // Faz B: eklenti yok (S165): ses + takvim; eklentinin yokluğu uyarı değil
   if(top&&s.toplanti&&s.toplanti.mic_bilinmiyor)so.push(["wa",L("Eklenti çalışmıyor: sessize alman Suflor'a ulaşmıyor"),L("özel bir şey söyleyeceksen gizli kipi aç")])

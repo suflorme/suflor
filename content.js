@@ -3,7 +3,21 @@
 // platformdan bağımsız çekirdek. Sayfaya özgü seçiciler ve metinler platform dosyasında (platform-teams.js …),
 // manifest onu bu dosyadan önce yükler ve globalThis.SuflorPlatform olarak verir; arayüz platform-teams.js başında.
 (() => {
-  if (window.__ohCanliLoaded) return; window.__ohCanliLoaded = true;
+  // v0.255.1 (beta #89/#90): eklenti yeniden yüklenince/güncellenince açık sekmedeki eski betik "yetim" kalır: chrome.runtime bağlamı geçersiz,
+  // arka planın "nabiz" mesajı "Receiving end does not exist" döner, ama zamanlayıcıları ve fetch'i sürer. Arka plan betiği o sekmeye yeniden
+  // yükler (background.js betikYenidenYukle). Çift yükleme koruması: önceki örnek yaşıyorsa (bağlamı geçerli) ikinci örnek kurulmaz; ölüyse
+  // yeni örnek kurulur, eski örneğin şeridi kaldırılır. Eski sürümün bayrağı (true) yaşadığını söyleyemez: yalnız arka planın yeniden yükleme
+  // işareti varsa ölü sayılır. Yetim örnek kendini susturur: zamanlayıcıları ve aktarıcı isteği bağlam geçersizken çalışmaz (aşağıda oldu()).
+  const onceki = window.__ohCanliLoaded, zorla = !!window.__suflorYenidenYukle; delete window.__suflorYenidenYukle;
+  if (onceki) {
+    let yasiyor; try { yasiyor = typeof onceki === "function" ? onceki() : !zorla; } catch (e) { yasiyor = false; }
+    if (yasiyor) return;
+    for (const id of ["suflor-serit", "suflor-toast"]) { const e = document.getElementById(id); if (e) e.remove(); }
+  }
+  const oldu = () => { try { return !chrome.runtime || !chrome.runtime.id; } catch (e) { return true; } };
+  window.__ohCanliLoaded = () => !oldu();
+  const setInterval = (f, ms, ...a) => window.setInterval(() => { if (!oldu()) f(...a); }, ms);  // yetim örneğin döngüleri durur
+  const setTimeout = (f, ms, ...a) => window.setTimeout(() => { if (!oldu()) f(...a); }, ms);
   const P = globalThis.SuflorPlatform; if (!P) return;  // platform dosyası yüklenmedi: bu sayfada Suflor.me çalışmaz
   const TIME_RE = /^\d{1,2}:\d{2}(:\d{2})?$/;
   const SKIP_RE = P.SKIP_RE || /^$/;
@@ -81,7 +95,7 @@
   });
   // her istek en çok 8 sn bekler — 3 Ekim denemesinde nabız ~7 dk kesildi, mikrofon sesi akmaya devam etti; zaman aşımı
   // olmayan bir istek takılırsa onu bekleyen her şey (nabız → kuyruk boşaltma) de takılıyordu
-  const rf = (yol, o) => hazir.then(() => alanBekliyor ? Promise.reject(new Error("çalışma alanı seçilmedi")) : fetch((relayGecerli(cfg.relay) || RELAY_VARSAYILAN) + yol, Object.assign({ signal: AbortSignal.timeout(8000) }, o)));
+  const rf = (yol, o) => oldu() ? Promise.reject(new Error("eklenti bağlamı koptu")) : hazir.then(() => alanBekliyor ? Promise.reject(new Error("çalışma alanı seçilmedi")) : fetch((relayGecerli(cfg.relay) || RELAY_VARSAYILAN) + yol, Object.assign({ signal: AbortSignal.timeout(8000) }, o)));
   // arayüz dilini aktarıcıdan oku (yalnız üst çerçeve, dakikada bir); değişince storage.local "dil" — diğer sekmeler ve
   // popup onChanged ile alır. Alan yoksa (eski aktarıcı) "tr".
   async function dilOku() {
@@ -326,7 +340,7 @@
   }
   // Yakalama mic-main.js'te (sayfa bağlamı); burada yalnız komut, Teams sessiz denetimi ve aktarıcıya gönderim
   window.addEventListener("message", e => {
-    if (e.source !== window || !e.data || window.top !== window) return;
+    if (e.source !== window || !e.data || window.top !== window || oldu()) return;  // yetim örnek mikrofon sesini göndermez (yeni örnekle çift olmasın)
     if (e.data.__suflor === "micPcm" && mic.on) {
       if (ks && e.data.pcm) { const k = new Int16Array(e.data.pcm.slice(0)); ks.buf.push(k); ks.n += k.length; }  // şeritteki Konuş basılıyken ses ona da gider
       if (teamsSessiz()) { if (mic.n) micGonder(); return; }  // Teams'te mikrofon kapalı: kullanıcının odadaki sesi yazılmaz
