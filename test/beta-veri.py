@@ -45,6 +45,26 @@ kontrol("yankı: 19 yankı / 1 satır (eşik altı sayı) ve %50 tam (50/50) →
 kontrol("yankı: hiç satır yok → oran None, normal", yk(0, 0)["yanki_oran_yuzde"] is None and yk(0, 0)["ses_yolu"] == "normal")
 kontrol("yankı tanıma: bölge sayıları yalnız sayı olarak (hepsi sıfırsa alan yok)", yk(6, 5, {"yanki": 6, "ara": 1, "yankisiz": 5})["tanima"] == {"yanki": 6, "ara": 1, "yankisiz": 5}
         and "tanima" not in yk(6, 5, {"yanki": 0, "ara": 0, "yankisiz": 0}) and "tanima" not in yk(6, 5))
+# v0.255.x: nabız kopması / betik yeniden yüklendi / mikrofon kanalı kopuk — günlük satırı → yalnız sayaç; pakette yalnız tamsayı
+_g2 = {"re": re, "time": time, "threading": threading, "BETA": {"olay": []}, "BETA_K": threading.Lock(), "BETA_OLAY_EN_COK": 6000}
+exec(re.search(r"def beta_olay\(ad\):.*?\n(?=def _beta_yaz)", _kaynak, re.S).group(0), _g2)
+exec(re.search(r"def beta_say\(ad, bas, son\):.*?\n(?=def beta_satir)|def beta_say\(ad, bas, son\):.*?\n(?=# günlük)", _kaynak, re.S).group(0), _g2)
+exec(re.search(r"BETA_RX = \[.*?\n(?=def beta_satir)", _kaynak, re.S).group(0) + re.search(r"def beta_satir\(l\):.*?\n(?=# kullanıcının)", _kaynak, re.S).group(0), _g2)
+exec(re.search(r"def _beta_olaylar\(bas, son\):.*?\n(?=\s*\n)", _kaynak, re.S).group(0), _g2)
+for _l in ("EKLENTİ: nabiz · toplantı sekmesi yanıt vermiyor (Zeynep Kartaloğlu sekmesi) — sekmeyi yenile",
+           "EKLENTİ: nabiz · betik yeniden yüklendi — toplantı sekmesi yanıt veriyor (7 dosya)",
+           "EKLENTİ: nabiz · betik yeniden yüklendi ama sekme yanıt vermiyor (7 dosya)",
+           "EKLENTİ: nabiz · betik yeniden yüklenemedi (Bozkurt)", "EKLENTİ: nabiz · toplantı sekmesi yeniden yanıt veriyor",
+           "MİKROFON KANALI: kopuk — 45 sn'dir senin sesin yazılmıyor (neden betik, uygulama Akdeniz)", "MİKROFON KANALI: düzeldi (50 sn kopuk kaldı)"):
+    _g2["beta_satir"](_l)
+_o2 = _g2["_beta_olaylar"](0, time.time() + 10)
+kontrol("sayaç: nabiz_kopma 1, betik_yeniden_yuklendi 2 (yüklenemedi ve 'yeniden yanıt veriyor' sayılmaz), ben_kopuk 1 (düzeldi sayılmaz)",
+        (_o2["nabiz_kopma"], _o2["betik_yeniden_yuklendi"], _o2["ben_kopuk"]) == (1, 2, 1), _o2)
+_kp = teshis.temizle({"tur": "toplanti_sonu", "kalite": {"olay": _o2}})["kalite"]["olay"]
+kontrol("sayaç: süzgeçten sonra üçü de tamsayı olarak kalır, metin sızmaz", all(isinstance(_kp.get(k), int) for k in ("nabiz_kopma", "betik_yeniden_yuklendi", "ben_kopuk"))
+        and (_kp["nabiz_kopma"], _kp["betik_yeniden_yuklendi"], _kp["ben_kopuk"]) == (1, 2, 1) and not sizinti(_g2["BETA"]["olay"]) and not sizinti(_kp), _kp)
+_kp2 = teshis.temizle({"kalite": {"olay": {"nabiz_kopma": "Zeynep Kartaloğlu", "ben_kopuk": EPOSTA}}})["kalite"]["olay"]
+kontrol("sayaç: metin değeri verilirse gitmez", not sizinti(_kp2), _kp2)
 _tt = teshis.temizle({"kalite": {"ses": yk(6, 5, {"yanki": 6, "ara": 1, "yankisiz": 5})}})["kalite"]["ses"]
 kontrol("yankı tanıma: süzgeç bölge sayılarını tutar", _tt.get("tanima") == {"yanki": 6, "ara": 1, "yankisiz": 5} and not sizinti(_tt), _tt)
 ty = teshis.temizle({"kalite": {"ses": dict(yk(792, 278), ek="Zeynep Bozkurt")}, "x": 1})["kalite"]["ses"]

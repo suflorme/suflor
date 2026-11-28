@@ -55,7 +55,10 @@ BETA_RX = [("dur", re.compile(r"^ASİSTAN: '.*, dur'$")), ("sus_kisayol", re.com
            ("gizli", re.compile(r"^GİZLİ: açıldı")), ("moderator", re.compile(r"^MODERATÖR: başladı")),
            ("zaman_asimi", re.compile(r"^KONUŞ: .*zaman aşımı")),
            ("on_arama", re.compile(r"^KONUŞ: ön arama \d+ sonuç")), ("on_arama_bos", re.compile(r"^KONUŞ: ön arama sonuç yok")),
-           ("oto_izin", re.compile(r"^İZİN: otomatik — "))]  # v0.121.0: proje bilgisine ulaşma
+           ("oto_izin", re.compile(r"^İZİN: otomatik — ")),  # v0.121.0: proje bilgisine ulaşma
+           ("nabiz_kopma", re.compile(r"^EKLENTİ: nabiz · toplantı sekmesi yanıt vermiyor")),  # background.js nabizOlay("nabiz", …) → relay /olay → "EKLENTİ: <tur> · <metin>"
+           ("betik_yeniden_yuklendi", re.compile(r"^EKLENTİ: nabiz · betik yeniden yüklendi( |$)")),  # "yüklenemedi" ayrı (yüklendi ≠ yüklenemedi)
+           ("ben_kopuk", re.compile(r"^MİKROFON KANALI: kopuk"))]  # saglik.py ben_kopuk_view: kopukluk başına bir satır
 def beta_satir(l):
     for ad, rx in BETA_RX:
         if rx.search(l): beta_olay(ad); return
@@ -190,7 +193,7 @@ def _beta_proje_vt():
     return {"kayit_vt": False, "kuruldu": True, "tablo": int(k.get("tablo") or 0), "satir": int(k.get("satir") or 0), "kart": bool(kart),
             "kart_kisi": int(kart.get("kisi") or 0), "kart_is": int(kart.get("acik_is") or 0), "kart_karar": int(kart.get("karar") or 0)}
 def _beta_olaylar(bas, son):
-    return {a: beta_say(a, bas, son) for a in ("dur", "sus_kisayol", "hitap_yinelenen", "kanit", "sessiz", "sesli_ceviri", "gizli", "moderator", "zaman_asimi", "sorun", "hata")}
+    return {a: beta_say(a, bas, son) for a in ("dur", "sus_kisayol", "hitap_yinelenen", "kanit", "sessiz", "sesli_ceviri", "gizli", "moderator", "zaman_asimi", "sorun", "hata", "nabiz_kopma", "betik_yeniden_yuklendi", "ben_kopuk")}
 
 YANKI_ESIK_ADET, YANKI_ESIK_YUZDE = 20, 50  # en az 20 yankı ve oran > %50 → "hoparlor_yankisi"
 def _beta_yanki(yanki, ben, tanima=None):  # v0.238.3: ben kanalına sızıp karşıyla aynı olduğu için atılan parçalar / (atılan + ben satırı); yalnız sayı ve seçenek

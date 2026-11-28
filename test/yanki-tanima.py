@@ -131,10 +131,25 @@ ak["_yanki_bosalt"](zorla=True)
 bak("akış: ara bölge karşı satırı beklenirken bekletilir, gelince yalnız yankı sözcükleri çıkar", r1 == "bekletildi" and yaz[-1] == ("e", "bilmiyorum ama ben bakarım"), (r1, yaz[-1]))
 bak("akış: ara bölgede kırpılan sayılır", ak["STATE"]["whisper"]["yanki_tanima"]["kirpilan"] == 2, ak["STATE"]["whisper"]["yanki_tanima"])
 # yankı tanıma iş parçacığı: yankı Whisper'a gitmez, kullanıcı sözü yankısız işaretle gider; karşı akmıyorsa / ayar kapalıysa parça doğrudan WH_Q'ya
-ak["_yt_np"] = lambda: np; ak["_YT"]["sg"] = None
 simdi = time.time(); KT0 = simdi - SURE + 1
 for a in range(0, len(karsi), SR // 2): ak["KARSI_TAMPON"].ekle(KT0 + a / SR, pcm(karsi[a:a + SR // 2]))
 def yt_is(id_, mik, a, b): p_, t0, t1 = parca(mik, a, b); return {"id": id_, "kanal": "ben", "t0": t0 - T0 + KT0, "t1": t1 - T0 + KT0, "pcm": p_, "kuyruga": time.time()}
+# v0.255.2 (25 Kasım: numpy/scipy ilk ben parçasında yankı tanıma iş parçacığında ~100 sn yüklendi, 7 ben parçası 53–102 sn bekledi):
+# yükleme bitmeden gelen parça beklemez, doğrudan Whisper'a; yükleme ayrı iş parçacığında bir kez başlar
+yuk = []; bitti = threading.Event()
+def yavas_np():  # gerçek _yt_np gibi: denendi kilit altında baştan işaretlenir, yükleme uzun sürer
+    with ak["_YT"]["kilit"]:
+        if ak["_YT"]["denendi"]: return None
+        ak["_YT"]["denendi"] = True
+    yuk.append(time.time()); bitti.wait(5); ak["_YT"].update(np=np, hazir=True); return np
+ak["_yt_np"] = yavas_np; t_ = time.time()
+r0 = ak["yt_kuyruga"](yt_is("s1", kul + gurultu, 12, 15)); gec_ = time.time() - t_
+time.sleep(0.2); ak["yt_kuyruga"](yt_is("s2", kul + gurultu, 12, 15))
+bak("ısınma: numpy/scipy yüklenmeden gelen ben parçası beklemez, doğrudan Whisper'a", r0 is False and gec_ < 0.1, f"{r0} {gec_:.3f} sn")
+bak("ısınma: yükleme ayrı iş parçacığında bir kez başlar", len(yuk) == 1 and ak["_YT"]["q"].empty(), yuk)
+bitti.set(); time.sleep(0.2)
+bak("ısınma: yükleme bitince parça yankı tanımaya alınır", ak["_YT"]["hazir"] is True)
+ak["_yt_np"] = lambda: np; ak["_YT"]["sg"] = None
 bak("akış: karşı akarken ben parçası yankı tanımaya alınır", ak["yt_kuyruga"](yt_is("y1", yanki80, 5, 8)) and ak["yt_kuyruga"](yt_is("y2", kul + gurultu, 12, 15)))
 t = time.time(); gelen = []
 while time.time() - t < 5 and len(gelen) < 1:
@@ -151,6 +166,18 @@ ak["STATE"]["whisper"]["kanallar"]["karsi"] = time.time(); ak["_yt_np"] = lambda
 try: g = ak["WH_Q"].get(timeout=3)
 except queue.Empty: g = {}
 bak("akış: numpy yoksa parça işaretsiz Whisper'a (geri sayılır)", g.get("id") == "y5" and "yt_bolge" not in g and ak["STATE"]["whisper"]["yanki_tanima"]["geri"] == 1)
+# yankı tanıma kuyruğunda takılmış (YT_BAYAT_SN'den eski) parça hesapsız Whisper'a; taze parçanın sırası ve yankı kararı bozulmaz
+ak["_yt_np"] = lambda: np; cagri = []; eski_parca = ak["yt_parca"]
+ak["yt_parca"] = lambda is_: cagri.append(is_["id"]) or eski_parca(is_)
+b1 = yt_is("b1", kul + gurultu, 12, 15); b1["yt_kuyruk"] = time.time() - ak["YT_BAYAT_SN"] - 1; ak["_YT"]["q"].put(b1)
+ak["yt_kuyruga"](yt_is("b2", yanki80, 5, 8)); ak["yt_kuyruga"](yt_is("b3", kul + gurultu, 12, 15))
+gelen = []; t = time.time()
+while time.time() - t < 5 and len(gelen) < 2:
+    try: gelen.append(ak["WH_Q"].get(timeout=0.2))
+    except queue.Empty: pass
+bak("bayat: kuyrukta takılan parça hesapsız Whisper'a, geri sayılır", gelen and gelen[0]["id"] == "b1" and "yt_bolge" not in gelen[0] and "b1" not in cagri and ak["STATE"]["whisper"]["yanki_tanima"]["geri"] == 2, ([g["id"] for g in gelen], cagri))
+bak("bayat: arkasındaki taze yankı yine atılır, kullanıcı sözü sırayla gelir", [g["id"] for g in gelen] == ["b1", "b3"] and gelen[1].get("yt_bolge") == "yankisiz" and ak["STATE"]["whisper"]["yanki_tanima"]["atlanan_whisper"] == 2, [(g["id"], g.get("yt_bolge")) for g in gelen])
+ak["yt_parca"] = eski_parca
 
 # --- gerçek kayıt: 13 Kasım 02.27, masaüstü Teams, MacBook hoparlörü, 12 ben parçası --------------------------------------------
 # Ölçüm raporu §7(e): 540, 543, 549, 554, 557, 560. sn yankı; 630. sn (0,84 sn, 0,31) ara; 189, 576, 580, 585, 619. sn yankısız.

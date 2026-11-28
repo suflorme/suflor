@@ -795,6 +795,7 @@ def _isci_dongu():
         if "gizli_acik" in globals() and gizli_acik(): continue  # v0.89.1: gizli toplantı — parça işlenmeden atılır, işçi açılmaz
         if is_.get("isinma"):  # toplantıdan önce modeli belleğe al (ilk cümle beklemesin)
             if not _ISCI["p"] or _ISCI["p"].poll() is not None: _isci_ac()
+            if "yt_isit" in globals(): yt_isit()  # yankı tanımanın numpy/scipy'si de toplantıdan önce (ilk ben parçası beklemesin)
             continue
         # eşik 45 → 120 sn — altyazı gölgedeyken atlanan parça dökümden tamamen kayboluyordu (6 Ekim: en kötü 45,6 sn)
         if time.time() - is_["kuyruga"] > WH_ATLA_SN:
@@ -1463,12 +1464,20 @@ def _yanki_bosalt(zorla=False):
 # yanki_tanima_kayma_ms (400), yanki_tanima_kisa_ust / yanki_tanima_enerji_db (varsayılan kapalı). Görünürlük: STATE whisper.yanki_tanima,
 # ses arşivinin parcalar.jsonl'i ("yanki": tutarlılık, kayma, bölge), whisper-isler.jsonl (sonuc "yanki_ses"); beta'ya yalnız bölge sayıları.
 YT_BEKLE_SN = 1.5
+# 25 Kasım (93 dk Meet, bellek dar: takas 2,5 GB, yük 7,4): numpy + scipy ilk ben parçasında, yankı tanıma iş parçacığının içinde yüklendi ve ~100 sn sürdü;
+# o sürede gelen 7 ben parçası _YT["q"]'da bekledi (102, 64, 62 … sn; Whisper işçisi boştu, karşı parçalar 0 sn bekledi — sorun kuyruk sırası değildi).
+# v0.255.2: yükleme parçanın yolundan çıktı — ısınmada ayrı iş parçacığında başlar; bitmeden gelen ben parçası yankı tanımaya girmez, doğrudan Whisper'a
+# (metin süzgeci eskisi gibi). Her ihtimale karşı: yankı tanıma kuyruğunda YT_BAYAT_SN'den uzun kalmış parça hesapsız Whisper'a gider ("geri" sayılır).
+YT_BAYAT_SN = 5.0
 KARSI_TAMPON = KarsiTampon()
-_YT = {"q": queue.Queue(maxsize=200), "th": None, "np": None, "sg": None, "denendi": False, "hata_t": 0.0, "kayma": None, "baglasim": None, "n_yanki": 0}
+_YT = {"q": queue.Queue(maxsize=200), "th": None, "np": None, "sg": None, "denendi": False, "hazir": False, "kilit": threading.Lock(), "bayat_t": 0.0,
+       "hata_t": 0.0, "kayma": None, "baglasim": None, "n_yanki": 0}
 STATE["whisper"]["yanki_tanima"] = {"yanki": 0, "ara": 0, "yankisiz": 0, "geri": 0, "atlanan_whisper": 0, "kirpilan": 0, "kayma_ms": None, "baglasim_db": None, "ms": None}
 def _yt_np():  # numpy (aktarıcının sistem Python'unda kullanıcı paketlerinde olabilir); yoksa ortak smart-turn ortamının aynı sürüm numpy'si; ikisi de yoksa None
-    if _YT["denendi"]: return _YT["np"]
-    _YT["denendi"] = True; import sys as _s
+    with _YT["kilit"]:
+        if _YT["denendi"]: return _YT["np"]  # yükleme sürüyorsa None: çağıran eski yola düşer, beklemez
+        _YT["denendi"] = True
+    import sys as _s; t_bas = time.time()
     try: import numpy as _n
     except Exception:
         _n = None; y = os.path.join(_ORT, "smart-turn-venv", "lib", "python%d.%d" % _s.version_info[:2], "site-packages")
@@ -1481,9 +1490,12 @@ def _yt_np():  # numpy (aktarıcının sistem Python'unda kullanıcı paketlerin
                 except ValueError: pass
     try: import scipy.signal as _sg
     except Exception: _sg = None
-    _YT["np"], _YT["sg"] = _n, _sg
-    print("YANKI TANIMA: " + ("hazır (numpy " + _n.__version__ + (", scipy" if _sg else "") + ")" if _n is not None else "numpy yok — yalnız metin süzgeci"))
+    _YT["np"], _YT["sg"] = _n, _sg; _YT["hazir"] = True
+    print("YANKI TANIMA: " + ("hazır (numpy " + _n.__version__ + (", scipy" if _sg else "") + f", {time.time() - t_bas:.1f} sn)" if _n is not None else "numpy yok — yalnız metin süzgeci"))
     return _n
+def yt_isit():  # numpy/scipy yüklemesini ayrı iş parçacığında başlatır (bir kez); ben parçası onu beklemez
+    if _YT["hazir"] or _YT["denendi"] or not yt_acik(): return
+    threading.Thread(target=_yt_np, daemon=True, name="yanki-tanima-isit").start()
 def yt_acik(): return AYAR.get("yanki_tanima", True) is not False
 def _yt_sayi(ad, vars_):
     try: v = AYAR.get(ad); return float(v) if v is not None and v is not False else vars_
@@ -1495,6 +1507,7 @@ def yt_karsi_besle(t, pcm):
 def yt_kuyruga(is_):  # → True: parça yankı tanımaya alındı (WH_Q'ya o koyacak)
     if not yt_acik() or time.time() - STATE["whisper"]["kanallar"].get("karsi", 0) > WH_AKIS_SN or not KARSI_TAMPON.paket: return False
     if "gizli_acik" in globals() and gizli_acik(): return False
+    if not _YT["hazir"]: yt_isit(); return False  # numpy/scipy henüz yüklenmedi: parça beklemez, eski yoldan (metin süzgeci) gider
     is_["yt_kuyruk"] = time.time()
     try: _YT["q"].put_nowait(is_)
     except queue.Full: return False
@@ -1522,6 +1535,10 @@ def _yt_dongu():
     while True:
         is_ = _YT["q"].get()
         try:
+            if time.time() - is_.get("yt_kuyruk", time.time()) > YT_BAYAT_SN:  # yankı tanıma bir yerde takıldı: parça daha fazla beklemesin
+                STATE["whisper"]["yanki_tanima"]["geri"] += 1; WH_Q.put(is_)
+                if time.time() - _YT["bayat_t"] > 600: _YT["bayat_t"] = time.time(); print(f"YANKI TANIMA: ben parçası {time.time() - is_['yt_kuyruk']:.1f} sn kuyrukta kaldı — hesapsız Whisper'a")
+                continue
             son = is_.get("yt_kuyruk", time.time()) + YT_BEKLE_SN
             while KARSI_TAMPON.son < is_["t1"] + 0.15 and time.time() < son: time.sleep(0.05)  # karşı paketleri parçanın sonuna kadar gelsin
             r = None if ("gizli_acik" in globals() and gizli_acik()) else yt_parca(is_)
